@@ -55,6 +55,8 @@ enum class MenuItemId {
     Requests,
     Console,
     Cookies,
+    Storage,
+    CloseTab,
     AddToHome,
     ForceReload,
     Pip,

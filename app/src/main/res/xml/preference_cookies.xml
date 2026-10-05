@@ -47,6 +47,15 @@
         a:singleLineTitle="false"
         />
 
+    <Preference
+        a:key="@string/pref_key_add_cookie"
+        a:title="@string/pref_title_cookie_add"
+        a:summary="@string/pref_summary_cookie_add"
+        a:iconSpaceReserved="false"
+        a:icon="@drawable/ic_add"
+        a:singleLineTitle="false"
+        />
+
 
     <x.PreferenceCategory
         a:key="@string/pref_key_cat_cookies"

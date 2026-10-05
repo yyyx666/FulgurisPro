@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/dialog_padding">
+
+    <EditText
+        android:id="@+id/storageItemKey"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/storage_item_key"
+        android:importantForAutofill="no"
+        android:inputType="text">
+        <requestFocus/>
+    </EditText>
+
+    <EditText
+        android:id="@+id/storageItemValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/storage_item_value"
+        android:importantForAutofill="no"
+        android:inputType="text" />
+
+</LinearLayout>

@@ -274,6 +274,8 @@ class MenuPopupWindow : PopupWindow {
         iBinding.menuItemPageRequests.isVisible = false
         iBinding.menuItemConsole.isVisible = false
         iBinding.menuItemCookies.isVisible = false
+        iBinding.menuItemStorage.isVisible = false
+        iBinding.menuItemCloseTab.isVisible = false
         iBinding.menuItemForceReload.isVisible = false
         iBinding.menuItemLaunchApp.isVisible = false
         iBinding.menuItemPip.isVisible = false
@@ -317,6 +319,8 @@ class MenuPopupWindow : PopupWindow {
             MenuItemId.Requests -> iBinding.menuItemPageRequests.isVisible = true
             MenuItemId.Console -> iBinding.menuItemConsole.isVisible = true
             MenuItemId.Cookies -> iBinding.menuItemCookies.isVisible = true
+            MenuItemId.Storage -> iBinding.menuItemStorage.isVisible = true
+            MenuItemId.CloseTab -> iBinding.menuItemCloseTab.isVisible = true
             MenuItemId.ForceReload -> iBinding.menuItemForceReload.isVisible = true
             MenuItemId.LaunchApp -> iBinding.menuItemLaunchApp.isVisible = true
             MenuItemId.Pip -> iBinding.menuItemPip.isVisible = true
@@ -379,6 +383,8 @@ class MenuPopupWindow : PopupWindow {
                 iBinding.menuItemPageRequests.isVisible = false
                 iBinding.menuItemConsole.isVisible = false
                 iBinding.menuItemCookies.isVisible = false
+                iBinding.menuItemStorage.isVisible = false
+                iBinding.menuItemCloseTab.isVisible = false
                 iBinding.menuItemForceReload.isVisible = false
                 iBinding.menuItemLaunchApp.isVisible = false
                 iBinding.menuItemPip.isVisible = false
@@ -607,6 +613,16 @@ class MenuPopupWindow : PopupWindow {
                 } ?: return@let
 
                 iBinding.menuItemCookies.text = formatMenuItemWithCount(cookiesLabel, cookieCount)
+
+                // Storage gives access to those same cookies, show the count there too
+                val storageMenuItem = MenuItems.getItem(MenuItemId.Storage)
+                val storageLabel = storageMenuItem?.labelId?.let { labelId ->
+                    contentView.context.getString(labelId)
+                }
+
+                if (storageLabel != null) {
+                    iBinding.menuItemStorage.text = formatMenuItemWithCount(storageLabel, cookieCount)
+                }
 
                 // Update Ad Block menu item with blocked request count
                 val blockedCount = tab.webPageClient.getPageRequests().count { it.wasBlocked }

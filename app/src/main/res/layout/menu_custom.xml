@@ -368,6 +368,22 @@
                         android:text="@string/action_cookies" />
 
                     <TextView
+                        android:id="@+id/menuItemStorage"
+                        style="@style/BrowserTextMenuItem"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:drawableStartCompat="@drawable/ic_storage_outline"
+                        android:text="@string/action_storage" />
+
+                    <TextView
+                        android:id="@+id/menuItemCloseTab"
+                        style="@style/BrowserTextMenuItem"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:drawableStartCompat="@drawable/ic_action_delete"
+                        android:text="@string/close_tab" />
+
+                    <TextView
                         android:id="@+id/menuItemPrint"
                         style="@style/BrowserTextMenuItem"
                         android:visibility="gone"

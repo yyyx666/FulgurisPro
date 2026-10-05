@@ -16,6 +16,7 @@ import fulguris.download.LightningDownloadListener
 import fulguris.extensions.*
 import fulguris.isSupported
 import fulguris.network.NetworkConnectivityModel
+import fulguris.network.mergeHeaders
 import fulguris.settings.fragment.DisplaySettingsFragment.Companion.MIN_BROWSER_TEXT_SIZE
 import fulguris.settings.preferences.DomainPreferences
 import fulguris.settings.preferences.UserPreferences
@@ -1333,6 +1334,19 @@ class WebPageTab(
     fun canGoForward(): Boolean = webView?.canGoForward() == true
 
     /**
+     * Headers to load [url] with: our tab wide ones plus the custom headers configured for its
+     * domain, if any.
+     *
+     * Those custom headers only reach the main document here. The resources the page then loads
+     * on its own are covered by [fulguris.network.CustomHeaderInterceptor].
+     */
+    fun loadHeadersFor(url: String, headers: MutableMap<String, String> = requestHeaders): MutableMap<String, String> {
+        val host = Uri.parse(url).host ?: return headers
+        val customHeaders = DomainPreferences(activity, host).customHeadersMap
+        return if (customHeaders.isEmpty()) headers else mergeHeaders(headers, customHeaders)
+    }
+
+    /**
      * Loads the URL in the WebView. If the proxy settings
      * are still initializing, then the URL will not load
      * as it is necessary to have the settings initialized
@@ -1365,7 +1379,7 @@ class WebPageTab(
                 loadHistoryPage()
             }
         } else {
-            webView?.loadUrl(aUrl, requestHeaders)
+            webView?.loadUrl(aUrl, loadHeadersFor(aUrl))
         }
     }
 

@@ -324,7 +324,9 @@ dependencies {
     testImplementation 'com.nhaarman:mockito-kotlin:1.6.0', {
         exclude group: 'org.jetbrains.kotlin'
     }
-    testImplementation 'org.robolectric:robolectric:4.4'
+    // Robolectric 4.4 ships an ASM that cannot read our Java 17 class files
+    // ("Unsupported class file major version 61"), every Robolectric test needs 4.10+.
+    testImplementation 'org.robolectric:robolectric:4.14.1'
 
     // Jetpack AndroidX libraries
     implementation libs.androidx.palette.ktx
@@ -516,6 +518,7 @@ mezzanine {
     files = files(
             "src/main/js/TextReflow.js",
             "src/main/html/list.html",
+            "src/main/html/history.html",
             "src/main/html/bookmarks.html",
             "src/main/html/homepage.html",
             "src/main/html/private.html",

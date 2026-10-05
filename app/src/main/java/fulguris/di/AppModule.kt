@@ -7,6 +7,7 @@ import fulguris.extensions.landscapeSharedPreferencesName
 import fulguris.extensions.portraitSharedPreferencesName
 import fulguris.html.ListPageReader
 import fulguris.html.bookmark.BookmarkPageReader
+import fulguris.html.history.HistoryPageReader
 import fulguris.html.homepage.HomePageReader
 import fulguris.js.InvertPage
 import fulguris.js.NestedScrollDetect
@@ -186,6 +187,9 @@ class AppModule {
 
     @Provides
     fun providesBookmarkPageReader(): BookmarkPageReader = mezzanine<BookmarkPageReader>()
+
+    @Provides
+    fun providesHistoryPageReader(): HistoryPageReader = mezzanine<HistoryPageReader>()
 
     @Provides
     fun providesTextReflow(): TextReflow = mezzanine<TextReflow>()

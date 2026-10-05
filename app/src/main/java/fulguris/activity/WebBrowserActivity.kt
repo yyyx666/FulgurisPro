@@ -791,6 +791,14 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
                 dismiss()
                 showCookies()
             }
+            onMenuItemClicked(iBinding.menuItemStorage) {
+                dismiss()
+                showStorage()
+            }
+            onMenuItemClicked(iBinding.menuItemCloseTab) {
+                dismiss()
+                executeAction(R.id.action_close_tab)
+            }
             onMenuItemClicked(iBinding.menuItemShare) { dismiss(); executeAction(R.id.action_share) }
             onMenuItemClicked(iBinding.menuItemAddBookmark) { dismiss(); executeAction(R.id.action_add_bookmark) }
             onMenuItemClicked(iBinding.menuItemFind) { dismiss(); executeAction(R.id.action_find) }
@@ -1008,6 +1016,13 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
      */
     private fun showCookies() {
         iBottomSheet.setLayout(R.layout.fragment_cookies).show()
+    }
+
+    /**
+     * Show cookies and web storage for the current page in a bottom sheet
+     */
+    private fun showStorage() {
+        iBottomSheet.setLayout(R.layout.fragment_storage).show()
     }
 
     /**
@@ -2717,6 +2732,14 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
             R.id.action_force_reload -> {
                 // Force reload bypasses cache to get fresh content from server
                 tabsManager.currentTab?.reload(aForce = true)
+                return true
+            }
+            R.id.action_close_tab -> {
+                // Close the current tab, matching the tab bar close button behaviour
+                val position = tabsManager.indexOfCurrentTab()
+                if (position >= 0) {
+                    tabsManager.deleteTab(position)
+                }
                 return true
             }
             R.id.action_launch_app -> {

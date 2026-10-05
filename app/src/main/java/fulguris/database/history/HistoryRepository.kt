@@ -53,4 +53,25 @@ interface HistoryRepository {
      * @return a valid observable that emits a list of history items.
      */
     fun lastHundredVisitedHistoryEntries(): Single<List<HistoryEntry>>
+
+    /**
+     * An observable that emits up to [limit] of the most recently visited history items, most
+     * recent first. Used by the history page which needs more than the hundred items kept for the
+     * address bar suggestions.
+     *
+     * @param limit the maximum number of items to emit.
+     * @return a valid observable that emits a list of history items.
+     */
+    fun recentHistoryEntries(limit: Int): Single<List<HistoryEntry>>
+
+    /**
+     * An observable that finds all history items containing the given query, sorted by most
+     * recently visited. Unlike [findHistoryEntriesContaining] the result count is caller supplied,
+     * so it can back a full history search rather than the address bar suggestions.
+     *
+     * @param query the query to search for.
+     * @param limit the maximum number of items to emit.
+     * @return a valid observable that emits a list of history items.
+     */
+    fun searchHistoryEntries(query: String, limit: Int): Single<List<HistoryEntry>>
 }

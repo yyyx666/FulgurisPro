@@ -112,6 +112,8 @@ The ability of this project to finance itself is what will ultimately determine 
 
 Visit our [wiki](https://github.com/Slion/Fulguris/wiki) for information about the development and testing tools we use.
 
+To set up a machine and run Fulguris locally, see [docs/development.md](docs/development.md).
+
 [slions.net]: https://slions.net/resources/fulguris.10/
 [earlier version]: https://slions.net/resources/fulguris.10/history
 [Google Play]: https://play.google.com/store/apps/details?id=net.slions.fulguris.full.playstore

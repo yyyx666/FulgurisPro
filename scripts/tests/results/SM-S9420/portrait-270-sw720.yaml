@@ -1,0 +1,67 @@
+# Fulguris UI test run — SM-S9420 · portrait-270-sw720
+timestamp: '2026-10-05T16:51:51+00:00'
+device:
+  model: SM-S9420
+  brand: Samsung
+  product_name: SM-S9420
+  android: '14'
+config:
+  id: portrait-270-sw720
+  orientation: portrait
+  rotation: 270
+  smallest_width_dp: 720
+package: net.slions.fulguris.full.agent.debug
+options:
+  restart: false
+  keep_tabs: false
+  orientation: null
+  test_filter: null
+  group: smoke
+summary:
+  passed: 9
+  failed: 1
+  total: 10
+  ran: 5
+  duration_s: 49.2
+tests:
+- name: test_close_tab_entry_closes_the_current_tab
+  status: pass
+  duration_s: 33.4
+  ran: false
+- name: test_console_repl_evaluates_expression
+  status: pass
+  duration_s: 35.0
+  ran: false
+- name: test_storage_sheet_lists_local_storage
+  status: pass
+  duration_s: 28.6
+  ran: false
+- name: test_requests_sheet_lists_requests_with_details
+  status: pass
+  duration_s: 37.7
+  ran: false
+- name: test_history_page_groups_dates_and_shows_icons
+  status: pass
+  duration_s: 20.4
+  ran: false
+- name: test_smoke_launch
+  status: pass
+  duration_s: 2.3
+  ran: true
+- name: test_smoke_open_website
+  status: pass
+  duration_s: 10.1
+  ran: true
+- name: test_smoke_open_settings
+  status: fail
+  duration_s: 24.6
+  message: 'settings screen did not render (nodes: [''下载'', ''书签'', ''会话  默认'', ''历史记录'', ''标签菜单'', ''设置'', ''选项'', ''隐身''])'
+  ran: true
+- name: test_smoke_background_app_switch
+  status: pass
+  duration_s: 5.6
+  ran: true
+- name: test_smoke_background_home
+  status: pass
+  duration_s: 5.6
+  ran: true

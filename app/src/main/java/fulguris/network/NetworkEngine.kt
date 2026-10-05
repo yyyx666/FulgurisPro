@@ -99,34 +99,23 @@ interface NetworkEngine {
     }
 
     /**
+     * Cookies WebView holds for [url], as a `Cookie` header value, null when we hold none.
+     *
+     * CRITICAL for engines issuing the request themselves: interception happens before WebView's
+     * network stack attaches cookies, so [WebResourceRequest.getRequestHeaders] never carries a
+     * `Cookie` header for us to forward. Without asking [CookieManager] those requests browse the
+     * web logged out.
+     *
+     * Cookies are host scoped: ask again for every redirect hop instead of reusing one value
+     * across hosts.
+     */
+    fun cookiesFor(url: String): String? = CookieManager.getInstance().getCookie(url)?.takeIf { it.isNotBlank() }
+
+    /**
      * Get standard HTTP reason phrase for a status code.
      * HTTP/2 responses may have empty message, but Android requires non-empty reason phrase.
      */
-    fun getDefaultReasonPhrase(code: Int): String {
-        return when (code) {
-            200 -> "OK"
-            201 -> "Created"
-            202 -> "Accepted"
-            204 -> "No Content"
-            301 -> "Moved Permanently"
-            302 -> "Found"
-            304 -> "Not Modified"
-            307 -> "Temporary Redirect"
-            308 -> "Permanent Redirect"
-            400 -> "Bad Request"
-            401 -> "Unauthorized"
-            403 -> "Forbidden"
-            404 -> "Not Found"
-            405 -> "Method Not Allowed"
-            408 -> "Request Timeout"
-            429 -> "Too Many Requests"
-            500 -> "Internal Server Error"
-            502 -> "Bad Gateway"
-            503 -> "Service Unavailable"
-            504 -> "Gateway Timeout"
-            else -> "Unknown"
-        }
-    }
+    fun getDefaultReasonPhrase(code: Int): String = defaultReasonPhrase(code)
 
     /**
      * Called when this engine is selected by the user.
@@ -162,5 +151,35 @@ interface NetworkEngine {
      * Check if this engine supports caching.
      */
     fun supportsCache(): Boolean = false
+}
+
+/**
+ * Standard HTTP reason phrase for a status code.
+ * HTTP/2 responses may come without one and Android requires a non-empty reason phrase.
+ */
+fun defaultReasonPhrase(code: Int): String {
+    return when (code) {
+        200 -> "OK"
+        201 -> "Created"
+        202 -> "Accepted"
+        204 -> "No Content"
+        301 -> "Moved Permanently"
+        302 -> "Found"
+        304 -> "Not Modified"
+        307 -> "Temporary Redirect"
+        308 -> "Permanent Redirect"
+        400 -> "Bad Request"
+        401 -> "Unauthorized"
+        403 -> "Forbidden"
+        404 -> "Not Found"
+        405 -> "Method Not Allowed"
+        408 -> "Request Timeout"
+        429 -> "Too Many Requests"
+        500 -> "Internal Server Error"
+        502 -> "Bad Gateway"
+        503 -> "Service Unavailable"
+        504 -> "Gateway Timeout"
+        else -> "Unknown"
+    }
 }
 

@@ -191,8 +191,18 @@
     <string name="pref_key_incoming_url_action_override">pref_key_incoming_url_action_override</string>
     <string name="pref_key_cat_cookies">pref_key_cat_cookies</string>
     <string name="pref_key_delete_page_cookies">pref_key_delete_page_cookies</string>
+    <string name="pref_key_add_cookie">pref_key_add_cookie</string>
+    <string name="pref_key_add_header">pref_key_add_header</string>
+    <string name="pref_key_cat_custom_headers">pref_key_cat_custom_headers</string>
+    <string name="pref_key_custom_headers">pref_key_custom_headers</string>
+    <string name="pref_key_custom_headers_hint">pref_key_custom_headers_hint</string>
     <string name="pref_key_clear_location_permissions">pref_key_clear_location_permissions</string>
     <string name="pref_key_delete_all_domains_settings">pref_key_delete_all_domains_settings</string>
+
+    <string name="pref_key_storage_cookies">pref_key_storage_cookies</string>
+    <string name="pref_key_storage_refresh">pref_key_storage_refresh</string>
+    <string name="pref_key_cat_storage_local">pref_key_cat_storage_local</string>
+    <string name="pref_key_cat_storage_session">pref_key_cat_storage_session</string>
 
     <string name="pref_key_page_history">pref_key_page_history</string>
 

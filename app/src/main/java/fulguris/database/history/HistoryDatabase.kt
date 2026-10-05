@@ -104,6 +104,9 @@ class HistoryDatabase @Inject constructor(
         }
 
     override fun lastHundredVisitedHistoryEntries(): Single<List<HistoryEntry>> =
+        recentHistoryEntries(100)
+
+    override fun recentHistoryEntries(limit: Int): Single<List<HistoryEntry>> =
         Single.fromCallable {
             database.query(
                 TABLE_HISTORY,
@@ -113,7 +116,23 @@ class HistoryDatabase @Inject constructor(
                 null,
                 null,
                 "$KEY_TIME_VISITED DESC",
-                "100"
+                limit.toString()
+            ).useMap { it.bindToHistoryEntry() }
+        }
+
+    override fun searchHistoryEntries(query: String, limit: Int): Single<List<HistoryEntry>> =
+        Single.fromCallable {
+            val search = "%$query%"
+
+            return@fromCallable database.query(
+                TABLE_HISTORY,
+                null,
+                "$KEY_TITLE LIKE ? OR $KEY_URL LIKE ?",
+                arrayOf(search, search),
+                null,
+                null,
+                "$KEY_TIME_VISITED DESC",
+                limit.toString()
             ).useMap { it.bindToHistoryEntry() }
         }
 

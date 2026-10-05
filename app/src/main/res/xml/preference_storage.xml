@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen
+    xmlns:a="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <x.Preference
+        a:key="@string/pref_key_back"
+        a:title="@string/pref_title_storage"
+        tools:summary="https://example.com"
+        a:icon="@drawable/ic_arrow_back_ios"
+        a:fragment="back"
+        a:layout="@layout/preference_category_material"
+        a:allCapsTitle="true"
+        tools:ignore="PrivateResource" />
+
+    <!-- Cookies are handled by our dedicated settings fragment which we simply link to -->
+    <Preference
+        a:key="@string/pref_key_storage_cookies"
+        a:title="@string/pref_title_cookies"
+        a:summary="@string/pref_summary_storage_cookies"
+        a:icon="@drawable/ic_cookie_outline"
+        a:iconSpaceReserved="true"
+        a:fragment="fulguris.settings.fragment.CookiesSettingsFragment"
+        a:singleLineTitle="false" />
+
+    <Preference
+        a:key="@string/pref_key_storage_refresh"
+        a:title="@string/pref_title_storage_refresh"
+        a:summary="@string/pref_summary_storage_refresh"
+        a:icon="@drawable/ic_action_refresh"
+        a:iconSpaceReserved="true"
+        a:singleLineTitle="false" />
+
+    <!-- Both categories are populated at runtime with one preference per item -->
+    <x.PreferenceCategory
+        a:key="@string/pref_key_cat_storage_local"
+        a:title="@string/pref_category_title_storage_local"
+        a:icon="@drawable/ic_storage_outline"
+        a:singleLineTitle="false" />
+
+    <x.PreferenceCategory
+        a:key="@string/pref_key_cat_storage_session"
+        a:title="@string/pref_category_title_storage_session"
+        a:icon="@drawable/ic_storage_outline"
+        a:singleLineTitle="false" />
+
+</androidx.preference.PreferenceScreen>

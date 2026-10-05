@@ -1,11 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
-<layout xmlns:android="http://schemas.android.com/apk/res/android">
+<layout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools">
 
-    <androidx.fragment.app.FragmentContainerView
-        android:id="@+id/fragmentContainerView"
-        android:layout_width="wrap_content"
+    <LinearLayout
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:name="fulguris.settings.fragment.ConsoleFragment"/>
+        android:orientation="vertical">
+
+        <!-- REPL input bar -->
+        <LinearLayout
+            android:id="@+id/consoleInputBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingVertical="4dp">
+
+            <EditText
+                android:id="@+id/consoleInput"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="@string/console_input_hint"
+                android:inputType="textVisiblePassword|textNoSuggestions"
+                android:imeOptions="actionSend"
+                android:importantForAutofill="no"
+                android:textSize="14sp"
+                tools:ignore="LabelFor" />
+
+            <ImageButton
+                android:id="@+id/consoleRun"
+                style="?android:attr/actionButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/console_run"
+                android:tooltipText="@string/console_run"
+                app:srcCompat="@drawable/ic_play_arrow" />
+
+        </LinearLayout>
+
+        <!-- Filter / refresh / clear bar -->
+        <LinearLayout
+            android:id="@+id/consoleToolBar"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center_vertical"
+            android:paddingHorizontal="8dp"
+            android:paddingBottom="4dp">
+
+            <Spinner
+                android:id="@+id/consoleFilter"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:contentDescription="@string/console_filter"
+                android:tooltipText="@string/console_filter" />
+
+            <ImageButton
+                android:id="@+id/consoleRefresh"
+                style="?android:attr/actionButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/console_refresh"
+                android:tooltipText="@string/console_refresh"
+                app:srcCompat="@drawable/ic_action_refresh" />
+
+            <ImageButton
+                android:id="@+id/consoleClear"
+                style="?android:attr/actionButtonStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:contentDescription="@string/console_clear"
+                android:tooltipText="@string/console_clear"
+                app:srcCompat="@drawable/ic_delete_sweep_outline" />
+
+        </LinearLayout>
+
+        <androidx.fragment.app.FragmentContainerView
+            android:id="@+id/fragmentContainerView"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:name="fulguris.settings.fragment.ConsoleFragment" />
+
+    </LinearLayout>
 
 </layout>
-

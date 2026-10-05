@@ -10,8 +10,10 @@ package fulguris.network
 import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import okhttp3.Cache
+import okhttp3.Interceptor
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import timber.log.Timber
 import java.io.ByteArrayInputStream
 import java.io.File
@@ -83,6 +85,8 @@ class NetworkEngineOkHttp(
             .writeTimeout(30, TimeUnit.SECONDS)
             .followRedirects(true)
             .followSslRedirects(true)
+            // Carry the cookies of the page we are loading, see CookieInterceptor
+            .addNetworkInterceptor(CookieInterceptor())
 
         // Only add cache if size > 0
         if (cacheSizeBytes > 0) {
@@ -124,6 +128,44 @@ class NetworkEngineOkHttp(
                     Timber.e(e, "Error cleaning up old OkHttp client")
                 }
             }.start()
+        }
+    }
+
+    /**
+     * Attach the cookies WebView holds to the requests we send, and keep the ones the responses
+     * set.
+     *
+     * A *network* interceptor rather than an application one: OkHttp runs those again for every
+     * redirect it follows, which is what keeps each hop carrying the cookies of its own host. A
+     * redirect to another host must never see the cookies of the host we are leaving.
+     *
+     * Cookies of the response are applied here rather than through a [okhttp3.CookieJar] because
+     * that would cost us their attributes (HttpOnly in particular, which OkHttp drops when it
+     * parses them).
+     */
+    private inner class CookieInterceptor : Interceptor {
+
+        override fun intercept(chain: Interceptor.Chain): Response {
+            val request = chain.request()
+            val url = request.url.toString()
+
+            // header() replaces instead of adding, we never send two Cookie headers
+            val cookies = cookiesFor(url)
+            val outgoing = if (cookies == null) {
+                request
+            } else {
+                request.newBuilder().header("Cookie", cookies).build()
+            }
+
+            val response = chain.proceed(outgoing)
+
+            // When we intercept a request WebView leaves its Set-Cookie to us, see processCookies
+            val setCookies = response.headers.values("Set-Cookie")
+            if (setCookies.isNotEmpty()) {
+                processCookies(url, setCookies)
+            }
+
+            return response
         }
     }
 
@@ -176,11 +218,8 @@ class NetworkEngineOkHttp(
                 responseHeaders[name] = value
             }
 
-            // Process Set-Cookie headers using base interface method
-            val setCookieHeaders = response.headers("Set-Cookie")
-            if (setCookieHeaders.isNotEmpty()) {
-                processCookies(response.request.url.toString(), setCookieHeaders)
-            }
+            // Note the Set-Cookie of this response and of the redirects we followed were already
+            // applied by CookieInterceptor, which saw every hop
 
             // Create WebResourceResponse
             // HTTP/2 responses may have empty message, but Android requires non-empty reason phrase

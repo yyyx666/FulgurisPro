@@ -78,6 +78,15 @@
         x:singleLineTitle="false"
         />
 
+    <x.Preference
+        x:fragment="fulguris.settings.fragment.CustomHeadersSettingsFragment"
+        x:key="@string/pref_key_custom_headers"
+        x:title="@string/pref_title_custom_headers"
+        x:summary="@string/pref_summary_custom_headers"
+        x:icon="@drawable/ic_header"
+        x:singleLineTitle="false"
+        />
+
 <!--    <x.SwitchPreference-->
 <!--        a:key="@string/pref_key_known_domain"-->
 <!--        a:title="Known domain"-->

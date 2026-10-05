@@ -29,12 +29,12 @@ import androidx.preference.PreferenceCategory
 import dagger.hilt.android.AndroidEntryPoint
 import fulguris.R
 import fulguris.activity.WebBrowserActivity
+import fulguris.network.groupNewestFirstBy
 import fulguris.view.WebPageClient
 
 /**
  * Fragment to display all page requests and their blocked status
- * Groups requests by domain using preference categories
- * TODO: Add sort preference to toggle between sort by domain and sort by timestamp or order in our requests collection
+ * Groups requests by domain using preference categories, newest first
  */
 @AndroidEntryPoint
 class RequestsFragment : AbstractSettingsFragment() {
@@ -64,14 +64,18 @@ class RequestsFragment : AbstractSettingsFragment() {
     private fun populateRequestsList() {
         val preferenceScreen = preferenceScreen
 
-        // Group requests by domain
-        val requestsByDomain = requests.groupBy { request ->
-            try {
-                Uri.parse(request.url).host ?: getString(R.string.unknown)
-            } catch (e: Exception) {
-                getString(R.string.unknown)
+        // Group requests by domain, newest first at both levels
+        val requestsByDomain = groupNewestFirstBy(
+            requests,
+            timestamp = { it.timestamp },
+            key = { request ->
+                try {
+                    Uri.parse(request.url).host ?: getString(R.string.unknown)
+                } catch (e: Exception) {
+                    getString(R.string.unknown)
+                }
             }
-        }
+        )
 
         // Calculate statistics for the summary
         val totalRequests = requests.size
@@ -84,9 +88,7 @@ class RequestsFragment : AbstractSettingsFragment() {
             summary = getString(R.string.page_requests_summary, totalRequests, blockedRequests, allowedRequests)
         }
 
-        // Sort domains alphabetically
-        requestsByDomain.keys.sorted().forEach { domain ->
-            val domainRequests = requestsByDomain[domain] ?: emptyList()
+        requestsByDomain.forEach { (domain, domainRequests) ->
             val blocked = domainRequests.count { it.wasBlocked }
             val allowed = domainRequests.size - blocked
 
@@ -106,8 +108,8 @@ class RequestsFragment : AbstractSettingsFragment() {
                     title = extractPath(request.url).substringBefore('?')
                     isSingleLineTitle = true
                     titleEllipsize = TextUtils.TruncateAt.MIDDLE
-                    // Show URL parameters, file type, or scheme in summary
-                    summary = extractSummary(request.url)
+                    // Show method, status and content type, that's what a network inspector is for
+                    summary = extractNetworkSummary(request)
                     isSingleLineSummary = true
                     summaryEllipsize = TextUtils.TruncateAt.MIDDLE
                     isIconSpaceReserved = false
@@ -134,6 +136,19 @@ class RequestsFragment : AbstractSettingsFragment() {
                     extras.putString("url", request.url)
                     extras.putBoolean("was_blocked", request.wasBlocked)
                     extras.putLong("timestamp", request.timestamp)
+                    extras.putString("method", request.method)
+                    extras.putBoolean("is_main_frame", request.isMainFrame)
+                    extras.putString("resource_type", request.resourceType)
+                    extras.putInt("status_code", request.statusCode ?: -1)
+                    extras.putString("mime_type", request.mimeType)
+                    extras.putLong("duration_ms", request.durationMs ?: -1L)
+                    extras.putLong("body_id", request.bodyId ?: -1L)
+                    extras.putLong("body_size", request.bodySize ?: -1L)
+                    extras.putBoolean("body_truncated", request.bodyTruncated)
+                    extras.putStringArrayList(
+                        "request_headers",
+                        ArrayList(request.requestHeaders.map { "${it.key}: ${it.value}" })
+                    )
                 }
                 category.addPreference(pref)
             }
@@ -151,9 +166,22 @@ class RequestsFragment : AbstractSettingsFragment() {
     }
 
     /**
-     * Extract the path from a URL for display as title
+     * Summarize what the network layer told us about a request.
+     * Falls back to our URL based summary when we have no metadata to show.
      */
-    private fun extractPath(url: String): String {
+    private fun extractNetworkSummary(request: WebPageClient.PageRequest): String {
+        val parts = mutableListOf<String>()
+        if (request.method.isNotEmpty()) {
+            parts.add(request.method)
+        }
+        request.statusCode?.let { parts.add(it.toString()) }
+        (request.mimeType ?: request.resourceType)?.let { parts.add(it) }
+        return if (parts.isEmpty()) extractSummary(request.url) else parts.joinToString(" · ")
+    }
+
+    /**
+     * Extract the path from a URL for display as title
+     */    private fun extractPath(url: String): String {
         return try {
             val uri = Uri.parse(url)
             val path = uri.path ?: "/"

@@ -23,6 +23,9 @@
     <string name="action_duplicate_tab">Duplicate tab</string>
     <string name="action_share">Share</string>
     <string name="action_history">History</string>
+    <string name="history_search_hint">Search history</string>
+    <string name="history_group_today">Today</string>
+    <string name="history_group_yesterday">Yesterday</string>
     <string name="action_bookmarks">Bookmarks</string>
     <string name="action_downloads">Downloads</string>
     <string name="action_add_bookmark">Add bookmark</string>
@@ -616,7 +619,38 @@
     <string name="pref_summary_manage_cookies">Manage current page cookies</string>
     <string name="pref_title_cookies_delete_all">Delete all</string>
     <string name="pref_summary_cookies_delete_all">Delete all cookies for current page</string>
+    <string name="pref_title_cookie_add">Add cookie</string>
+    <string name="pref_summary_cookie_add">Add a cookie for the current page</string>
+    <string name="cookie_item_new_title">New cookie</string>
+    <string name="cookie_item_edit_title">Edit cookie</string>
+    <string name="cookie_item_save">Save</string>
+    <string name="cookie_item_delete">Delete</string>
+    <string name="cookie_item_name">Name</string>
+    <string name="cookie_item_value">Value</string>
+    <string name="cookie_item_domain">Domain</string>
+    <string name="cookie_item_path">Path</string>
+    <string name="cookie_item_domain_path_hint">Optional, when empty the cookie applies to the current page</string>
+    <string name="cookie_invalid_name">Name cannot be empty</string>
     <string name="question_delete_all_page_cookies">Delete all cookies for current page?</string>
+
+    <string name="pref_title_custom_headers">Custom headers</string>
+    <string name="pref_summary_custom_headers">Add request headers sent to this domain</string>
+    <string name="pref_title_header_add">Add header</string>
+    <string name="pref_summary_header_add">Add a request header for this domain</string>
+    <string name="pref_summary_custom_headers_none">No custom headers</string>
+    <string name="custom_header_item_new_title">New header</string>
+    <string name="custom_header_item_edit_title">Edit header</string>
+    <string name="custom_header_item_save">Save</string>
+    <string name="custom_header_item_delete">Delete</string>
+    <string name="custom_header_item_name">Name</string>
+    <string name="custom_header_item_value">Value</string>
+    <string name="custom_header_item_scope_hint">Sent with every request to this domain and its resources. Requests carrying a body (POST, PUT, PATCH) and WebSocket handshakes are left out.</string>
+    <string name="custom_header_invalid_name">Name cannot be empty</string>
+    <plurals name="pref_summary_custom_headers_count">
+        <item quantity="one">One custom header</item>
+        <item quantity="other"><xliff:g id="headers_count" example="2">%d</xliff:g> custom headers</item>
+    </plurals>
+
     <!--
     Zero is not working for english:
     See: https://stackoverflow.com/a/42884713/3969362
@@ -821,6 +855,25 @@
     <string name="request_path">Path</string>
     <string name="request_parameters">Parameters</string>
     <string name="request_timestamp">Timestamp</string>
+    <string name="request_network">Network</string>
+    <string name="request_method">Method</string>
+    <string name="request_type">Type</string>
+    <string name="request_mime">MIME type</string>
+    <string name="request_duration">Duration</string>
+    <string name="request_duration_value">%1$d ms</string>
+    <string name="request_headers">Request headers</string>
+    <string name="request_headers_none">No header reported</string>
+    <string name="request_body">Response body</string>
+    <string name="request_body_view">View body</string>
+    <string name="request_body_json">JSON, pretty printed</string>
+    <string name="request_body_preview_image">Preview image</string>
+    <string name="request_body_raw">Raw bytes</string>
+    <string name="request_body_size">Body size</string>
+    <string name="request_body_truncated">%1$s, first part only</string>
+    <string name="request_body_unavailable_webview">Not captured: only the OkHttp or HttpUrlConnection network engine provides response bodies, see Settings – Network engine</string>
+    <string name="request_body_unavailable_method">Not captured: WebView handles this request itself, it has no response body we can read</string>
+    <string name="request_main_frame">Main frame</string>
+    <string name="request_unknown_value">Unknown</string>
     <string name="action_page_requests">Requests</string>
     <string name="page_requests_blocked">Blocked</string>
     <string name="page_requests_allowed">Allowed</string>
@@ -829,8 +882,49 @@
     <string name="pref_category_title_console">Console</string>
     <string name="pref_category_summary_console">%1$d total – %2$d errors / %3$d warnings</string>
     <string name="pref_summary_console_empty">No console messages for this page</string>
+    <string name="console_input_hint">JavaScript expression</string>
+    <string name="console_run">Run</string>
+    <string name="console_filter">Filter</string>
+    <string name="console_filter_all">All messages</string>
+    <string name="console_level_error">Errors</string>
+    <string name="console_level_warning">Warnings</string>
+    <string name="console_level_log">Logs</string>
+    <string name="console_level_tip">Tips</string>
+    <string name="console_level_debug">Debug</string>
+    <string name="console_refresh">Refresh</string>
+    <string name="console_clear">Clear</string>
+    <string name="console_repl_no_page">No page loaded</string>
     <string name="action_console">Console</string>
     <string name="action_cookies">Cookies</string>
+    <string name="action_storage">Storage</string>
+
+    <!-- Storage -->
+    <string name="pref_title_storage">Storage</string>
+    <string name="pref_summary_storage">Manage cookies and web storage</string>
+    <string name="pref_summary_storage_cookies">Manage cookies for the current page</string>
+    <string name="pref_title_storage_refresh">Refresh</string>
+    <string name="pref_summary_storage_refresh">Read storage from the current page</string>
+    <string name="pref_category_title_storage_local">Local storage</string>
+    <string name="pref_category_title_storage_session">Session storage</string>
+    <string name="storage_item_add">Add item</string>
+    <string name="storage_item_clear">Clear storage</string>
+    <string name="storage_item_key">Key</string>
+    <string name="storage_item_value">Value</string>
+    <string name="storage_item_new_title">New item</string>
+    <string name="storage_item_edit_title">Edit item</string>
+    <string name="storage_item_save">Save</string>
+    <string name="storage_item_delete">Delete</string>
+    <string name="storage_empty">No items</string>
+    <string name="storage_no_page">No page loaded</string>
+    <string name="storage_unavailable">Storage is not available for this page</string>
+    <string name="storage_clear_confirm_title">Clear storage</string>
+    <string name="storage_clear_confirm_message">Delete all items in %s?</string>
+    <string name="storage_invalid_key">Key cannot be empty</string>
+    <string name="storage_origin_unknown">Unknown origin</string>
+    <plurals name="pref_summary_storage_items">
+        <item quantity="one">One item</item>
+        <item quantity="other"><xliff:g id="items_count" example="4">%d</xliff:g> items</item>
+    </plurals>
     <string name="action_full_menu">Full menu</string>
     <string name="pref_summary_full_menu">Show full menu</string>
     <string name="action_launch">Launch</string>

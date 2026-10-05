@@ -28,6 +28,10 @@ import fulguris.js.InvertPage
 import fulguris.js.NestedScrollDetect
 import fulguris.js.SetMetaViewport
 import fulguris.js.TextReflow
+import fulguris.network.CapturedBody
+import fulguris.network.CustomHeaderInterceptor
+import fulguris.network.MAX_CAPTURED_BODIES_SIZE
+import fulguris.network.captureBody
 import fulguris.permissions.PermissionsManager
 import fulguris.settings.NoYesAsk
 import fulguris.settings.preferences.DomainPreferences
@@ -125,13 +129,31 @@ class WebPageClient(
     private var onPageFinishedDone = false
 
     // Track all requests for the current page and whether they were blocked
+    // Request side fields are always available, response side ones only when an engine handled it
     data class PageRequest(
         val url: String,
         val wasBlocked: Boolean,
-        val timestamp: Long = System.currentTimeMillis()
+        val timestamp: Long = System.currentTimeMillis(),
+        val method: String = "",
+        val isMainFrame: Boolean = false,
+        val resourceType: String? = null,
+        val statusCode: Int? = null,
+        val mimeType: String? = null,
+        val requestHeaders: Map<String, String> = emptyMap(),
+        val durationMs: Long? = null,
+        // Handle of the captured response body in [responseBodies], null when we captured none
+        val bodyId: Long? = null,
+        val bodySize: Long? = null,
+        val bodyTruncated: Boolean = false
     )
 
     private val pageRequests = mutableListOf<PageRequest>()
+
+    // Response bodies we captured, keyed by the handle stored on the matching [PageRequest].
+    // Bounded by [MAX_CAPTURED_BODIES_SIZE], oldest evicted first.
+    private val responseBodies = LinkedHashMap<Long, CapturedBody>()
+    private var responseBodiesSize = 0L
+    private var nextBodyId = 0L
 
     /**
      * Get all requests for the current page
@@ -139,10 +161,151 @@ class WebPageClient(
     fun getPageRequests(): List<PageRequest> = pageRequests.toList()
 
     /**
-     * Clear tracked requests
+     * Get the response body captured for [id], or null when we have none.
      */
-    fun clearPageRequests() {
-        pageRequests.clear()
+    fun getResponseBody(id: Long): CapturedBody? = synchronized(responseBodies) {
+        responseBodies[id]
+    }
+
+    /**
+     * Add a request to our tracking list.
+     */
+    private fun recordPageRequest(request: PageRequest) {
+        synchronized(pageRequests) {
+            pageRequests.add(request)
+        }
+    }
+
+    /**
+     * Complete a tracked request with what we learned from the response of an engine.
+     */
+    private fun updatePageRequestResponse(
+        request: PageRequest,
+        response: WebResourceResponse,
+        durationMs: Long,
+        captured: Pair<Long, CapturedBody>? = null
+    ) {
+        synchronized(pageRequests) {
+            val index = pageRequests.indexOf(request)
+            if (index >= 0) {
+                pageRequests[index] = request.copy(
+                    statusCode = response.statusCode,
+                    mimeType = response.mimeType,
+                    durationMs = durationMs,
+                    bodyId = captured?.first,
+                    bodySize = captured?.second?.size?.toLong(),
+                    bodyTruncated = captured?.second?.truncated == true
+                )
+            }
+        }
+    }
+
+    /**
+     * Capture the body of [response] for the network inspector, see [captureBody].
+     *
+     * The response keeps the whole body, we only tee off a prefix of it. Returns the handle under
+     * which the body got recorded, to be stored on the matching request, or null when the response
+     * carries no body at all.
+     */
+    private fun captureResponseBody(response: WebResourceResponse): Pair<Long, CapturedBody>? {
+        val input = response.data ?: return null
+
+        val capture = try {
+            captureBody(input)
+        } catch (e: Exception) {
+            // Capturing is a debugging aid, it must never break the page load
+            Timber.w(e, "Could not capture response body for ${response.mimeType}")
+            return null
+        }
+
+        response.data = capture.stream
+
+        synchronized(responseBodies) {
+            val id = nextBodyId++
+            responseBodies[id] = capture.body
+            responseBodiesSize += capture.body.size
+            evictResponseBodies()
+            return id to capture.body
+        }
+    }
+
+    /**
+     * Drop the oldest captured bodies until we are back within [MAX_CAPTURED_BODIES_SIZE].
+     */
+    private fun evictResponseBodies() {
+        val iterator = responseBodies.entries.iterator()
+        while (responseBodiesSize > MAX_CAPTURED_BODIES_SIZE && iterator.hasNext()) {
+            responseBodiesSize -= iterator.next().value.size
+            iterator.remove()
+        }
+    }
+
+    /**
+     * Forget the captured bodies no longer referenced by a tracked request.
+     *
+     * Called after requests are cleared, otherwise every navigation would leak up to
+     * [MAX_CAPTURED_BODIES_SIZE] of response bodies.
+     */
+    private fun pruneResponseBodies() {
+        synchronized(responseBodies) {
+            val live = synchronized(pageRequests) { pageRequests.mapNotNull { it.bodyId }.toSet() }
+            val iterator = responseBodies.entries.iterator()
+            while (iterator.hasNext()) {
+                val entry = iterator.next()
+                if (entry.key !in live) {
+                    responseBodiesSize -= entry.value.size
+                    iterator.remove()
+                }
+            }
+        }
+    }
+
+    /**
+     * Best effort guess of the type of resource being requested.
+     * Chromium tells us authoritatively through Sec-Fetch-Dest, other requests only give us Accept.
+     */
+    private fun guessResourceType(request: WebResourceRequest): String? {
+        val headers = request.requestHeaders
+
+        headers.entries.firstOrNull { it.key.equals("Sec-Fetch-Dest", ignoreCase = true) }?.let {
+            return it.value
+        }
+
+        if (request.isForMainFrame) {
+            return "document"
+        }
+
+        headers.entries.firstOrNull { it.key.equals("Accept", ignoreCase = true) }?.value?.let { accept ->
+            return when {
+                accept.contains("text/css") -> "style"
+                accept.contains("text/html") -> "document"
+                accept.contains("image/") -> "image"
+                accept.contains("application/font") || accept.contains("font/") -> "font"
+                accept.contains("javascript") -> "script"
+                else -> null
+            }
+        }
+
+        return null
+    }
+
+    /**
+     * Clear tracked requests.
+     *
+     * @param keepMainFrame when true we keep the main frame requests of the page we just started
+     *        loading. That is needed because the main document request is recorded in
+     *        [shouldInterceptRequest] which runs *before* the matching [onLoadResource] call we
+     *        reset from, so a blind clear would drop the most important request of every page.
+     */
+    fun clearPageRequests(keepMainFrame: Boolean = false) {
+        synchronized(pageRequests) {
+            if (keepMainFrame) {
+                pageRequests.removeAll { !it.isMainFrame }
+            } else {
+                pageRequests.clear()
+            }
+        }
+        pruneResponseBodies()
     }
 
 //    private var elementHide = userPreferences.elementHide
@@ -235,10 +398,18 @@ class WebPageClient(
             onPageFinishedDone = false
         }
 
-        // Track this request
-        synchronized(pageRequests) {
-            pageRequests.add(PageRequest(url, wasBlocked))
-        }
+        // Track this request along with everything we already know about it
+        val trackedRequest = PageRequest(
+            url = url,
+            wasBlocked = wasBlocked,
+            method = request.method,
+            isMainFrame = request.isForMainFrame,
+            resourceType = guessResourceType(request),
+            statusCode = response?.statusCode?.takeIf { it > 0 },
+            mimeType = response?.mimeType,
+            requestHeaders = request.requestHeaders.toMap()
+        )
+        recordPageRequest(trackedRequest)
 
         //SL: Use this when debugging
 //        if (response!=null)
@@ -256,12 +427,30 @@ class WebPageClient(
         }
 
         // Ad blocker did not block this request
+        // Now apply the custom request headers of that domain, if it has any. WebView only lets us
+        // attach headers to the main document, the ones we pass to WebPageTab.loadUrl: every
+        // resource the page then loads on its own has to be issued again from here to carry them.
+        val customHeaders = customHeadersFor(request.url.host)
+        if (customHeaders.isNotEmpty()) {
+            val startTime = System.currentTimeMillis()
+            val intercepted = customHeaderInterceptor.intercept(request, customHeaders)
+            if (intercepted != null) {
+                Timber.v("$ihs : Request handled with custom headers: ${request.url}")
+                val captured = captureResponseBody(intercepted)
+                updatePageRequestResponse(trackedRequest, intercepted, System.currentTimeMillis() - startTime, captured)
+                return intercepted
+            }
+        }
+
         // Now try the network engine if one is selected
         val engine = networkEngineManager.getCurrentEngine()
         if (engine != null) {
+            val startTime = System.currentTimeMillis()
             val engineResponse = engine.handleRequest(request)
             if (engineResponse != null) {
                 Timber.v("$ihs : Request handled by ${engine.displayName}: ${request.url}")
+                val captured = captureResponseBody(engineResponse)
+                updatePageRequestResponse(trackedRequest, engineResponse, System.currentTimeMillis() - startTime, captured)
                 return engineResponse
             }
         }
@@ -330,8 +519,10 @@ class WebPageClient(
             // Only now reset our counters to minimize cross-fire
             // Reset our resource count
             iResourceCount = 0
-            // Clear page requests for the new page
-            clearPageRequests()
+            // Clear the previous page's requests, keeping our main frame request: that one was
+            // recorded by shouldInterceptRequest, which runs before us, so clearing it would hide
+            // the page document itself from our network panel
+            clearPageRequests(keepMainFrame = true)
             // Clear console messages for the new page
             webPageTab.clearConsoleMessages()
         }
@@ -492,6 +683,9 @@ class WebPageClient(
 
         val uri  = url.toUri()
         loadDomainPreferences(uri.host ?: "", false)
+        // A page load is our cue that domain settings may have been edited, don't serve stale
+        // custom headers for the resources we are about to fetch
+        customHeadersCache.clear()
         //
         resetLocationPermissionIfNeeded()
         // Now assuming our root HTML document has been loaded
@@ -818,9 +1012,33 @@ class WebPageClient(
 
         Timber.d("$ihs : loadDomainPreferences for $aHost")
 
+        // Domain preferences are about to change, so are the custom headers derived from them
+        customHeadersCache.clear()
+
+        // Domain preferences are about to change, so are the custom headers derived from them
+        customHeadersCache.clear()
+
         // Load domain preferences
         // SharedPreferences cache is cleared when files are deleted, so we can safely load
         domainPreferences = DomainPreferences(app, aHost)
+    }
+
+    /**
+     * Reissue the resources of a domain carrying its custom request headers.
+     */
+    private val customHeaderInterceptor = CustomHeaderInterceptor()
+
+    /**
+     * Custom request headers configured for [aHost], empty when that domain has none.
+     *
+     * Cached: [shouldInterceptRequest] asks for those on every resource of the page and building a
+     * [DomainPreferences] means parsing the host into a top private domain.
+     */
+    private val customHeadersCache = mutableMapOf<String, Map<String, String>>()
+
+    private fun customHeadersFor(aHost: String?): Map<String, String> {
+        if (aHost == null) return emptyMap()
+        return customHeadersCache.getOrPut(aHost) { DomainPreferences(app, aHost).customHeadersMap }
     }
 
     // Used to debounce app launch
@@ -851,7 +1069,7 @@ class WebPageClient(
 
         val url = request.url.toString()
         val uri = Uri.parse(url)
-        val headers = webPageTab.requestHeaders
+        val headers = webPageTab.loadHeadersFor(url)
 
         // If this is an about page, immediately load, we don't need to leave the app
         // If we are in incognito, immediately load, we don't want the url to leave the app

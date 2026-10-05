@@ -27,20 +27,23 @@ import fulguris.activity.WebBrowserActivity
 import fulguris.di.UserPrefs
 import fulguris.extensions.launch
 import android.annotation.SuppressLint
-import android.content.ClipboardManager
-import android.content.Context.CLIPBOARD_SERVICE
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.view.LayoutInflater
 import android.view.View
 import android.webkit.CookieManager
+import android.widget.EditText
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import fulguris.app
-import fulguris.extensions.copyToClipboard
+import fulguris.extensions.onConfigurationChange
 import fulguris.extensions.toast
+import fulguris.utils.CookieFields
 import fulguris.utils.WebUtils
+import fulguris.utils.buildSetCookie
+import fulguris.utils.parseCookieFields
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import timber.log.Timber
 import javax.inject.Inject
@@ -94,6 +97,14 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
                     }
                     .launch()
 
+                true
+            }
+        )
+
+        clickablePreference(
+            preference = getString(R.string.pref_key_add_cookie),
+            onClick = {
+                currentPageUrl()?.let { showCookieDialog(it, null) }
                 true
             }
         )
@@ -195,6 +206,78 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
 
 
     /**
+     * URL of the page whose cookies we are managing, or null when no page is loaded.
+     */
+    private fun currentPageUrl(): String? =
+        (requireActivity() as? WebBrowserActivity)?.tabsManager?.currentTab?.url
+
+    /**
+     * Create or edit one cookie. Editing also allows deleting it.
+     *
+     * Note that our cookie API only reports `Domain` and `Path` when
+     * `WebViewFeature.GET_COOKIE_INFO` is supported: without it we can still edit the name and the
+     * value, and WebView files the cookie under the current page.
+     */
+    private fun showCookieDialog(url: String, existing: CookieFields?) {
+        val layout = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cookie_item, null)
+        val nameField = layout.findViewById<EditText>(R.id.cookieName)
+        val valueField = layout.findViewById<EditText>(R.id.cookieValue)
+        val domainField = layout.findViewById<EditText>(R.id.cookieDomain)
+        val pathField = layout.findViewById<EditText>(R.id.cookiePath)
+
+        nameField.setText(existing?.name.orEmpty())
+        valueField.setText(existing?.value.orEmpty())
+        domainField.setText(existing?.domain.orEmpty())
+        pathField.setText(existing?.path.orEmpty())
+
+        val builder = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(if (existing == null) R.string.cookie_item_new_title else R.string.cookie_item_edit_title)
+            .setView(layout)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.cookie_item_save) { _, _ ->
+                val name = nameField.text?.toString()?.trim().orEmpty()
+                if (name.isEmpty()) {
+                    activity?.toast(R.string.cookie_invalid_name)
+                    return@setPositiveButton
+                }
+                val fields = CookieFields(
+                    name = name,
+                    value = valueField.text?.toString().orEmpty(),
+                    domain = domainField.text?.toString()?.trim()?.takeIf { it.isNotEmpty() },
+                    path = pathField.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                )
+                // Renaming a cookie is a matter of writing the new one and expiring the old one
+                if (existing != null && existing.name != name) {
+                    setCookie(url, existing, delete = true)
+                }
+                setCookie(url, fields, delete = false)
+                populateCookieList()
+            }
+
+        if (existing != null) {
+            builder.setNeutralButton(R.string.cookie_item_delete) { _, _ ->
+                setCookie(url, existing, delete = true)
+                populateCookieList()
+            }
+        }
+
+        val dialog = builder.launch()
+        // Discard it on screen rotation as it's broken anyway
+        layout.onConfigurationChange { dialog.dismiss() }
+    }
+
+    /**
+     * Write [fields] back to the cookie jar, or expire that cookie when [delete] is set.
+     */
+    private fun setCookie(url: String, fields: CookieFields, delete: Boolean) {
+        val cookie = buildSetCookie(fields, delete)
+        Timber.d("${if (delete) "Delete" else "Set"} cookie: $cookie")
+        CookieManager.getInstance().setCookie(url, cookie)
+        // Make sure the change reaches the cookie store right away
+        CookieManager.getInstance().flush()
+    }
+
+    /**
      *
      */
     @SuppressLint("CheckResult")
@@ -203,51 +286,30 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
         catCookies?.removeAll()
         var cookiesCount = 0
 
-        (requireActivity() as? WebBrowserActivity)?.let { browser ->
-            browser.tabsManager.currentTab?.url?.let { url ->
-                Timber.d("URL: $url")
-                // Build our list of cookies
-                val cookies = WebUtils.getCookies(url)
+        currentPageUrl()?.let { url ->
+            Timber.d("URL: $url")
+            // Build our list of cookies
+            val cookies = WebUtils.getCookies(url)
 
-                Timber.v("Cookies count: ${cookies.count()}")
-                cookiesCount = cookies.count() ?: 0
-                cookies.forEach { cookie ->
-                    Timber.v(cookie.trim())
-                    // Create cookie preference
-                    val pref = x.Preference(requireContext())
+            Timber.v("Cookies count: ${cookies.count()}")
+            cookiesCount = cookies.count() ?: 0
+            cookies.forEach { cookie ->
+                Timber.v(cookie.trim())
+                val fields = parseCookieFields(cookie)
+                // Create cookie preference
+                val pref = x.Preference(requireContext()).apply {
                     // Make sure domains and not reversed domains are shown as titles
-                    pref.isSingleLineTitle = false
-                    //pref
-                    var summary = ""
-                    // For each attribute of that cookie
-                    cookie.split(';').forEach { attr ->
-                        if (pref.title.isNullOrEmpty()) {
-                            // First deal with name and value
-                            attr.split('=', limit = 2).forEach { comp ->
-                                if (pref.title.isNullOrEmpty()) {
-                                    pref.title = comp.trim()
-                                } else {
-                                    summary = comp.trim()
-                                }
-                            }
-                        } else {
-                            // We do not parse attributes beyond name and value
-                            // Just display them as they are then
-                            summary += "\n${attr.trim()}"
-                        }
+                    isSingleLineTitle = false
+                    title = fields.name
+                    summary = cookieSummary(fields, cookie)
+                    // Long pressing copies the raw cookie, tapping edits it
+                    isCopyingEnabled = true
+                    onPreferenceClickListener = Preference.OnPreferenceClickListener {
+                        showCookieDialog(url, fields)
+                        true
                     }
-
-                    // Tapping on the preference copies the cookie to the clipboard
-                    pref.onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                        val clipboard = requireContext().getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-                        clipboard.copyToClipboard(cookie,"Cookie")
-                        activity?.toast(R.string.message_cookie_copied)
-                        false
-                    }
-                    pref.summary = summary
-                    catCookies?.addPreference(pref)
-
                 }
+                catCookies?.addPreference(pref)
             }
         }
 
@@ -259,5 +321,16 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
             deleteAll?.isEnabled = false
         }
 
+    }
+
+    /**
+     * Show the cookie value followed by its attributes, one per line.
+     */
+    private fun cookieSummary(fields: CookieFields, cookie: String): String {
+        val attributes = cookie.split(';')
+            .drop(1)
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+        return (listOf(fields.value) + attributes).joinToString("\n")
     }
 }

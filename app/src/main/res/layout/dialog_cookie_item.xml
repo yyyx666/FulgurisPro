@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="@dimen/dialog_padding">
+
+    <EditText
+        android:id="@+id/cookieName"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/cookie_item_name"
+        android:importantForAutofill="no"
+        android:inputType="text">
+        <requestFocus/>
+    </EditText>
+
+    <EditText
+        android:id="@+id/cookieValue"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/cookie_item_value"
+        android:importantForAutofill="no"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/cookieDomain"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/cookie_item_domain"
+        android:importantForAutofill="no"
+        android:inputType="text" />
+
+    <EditText
+        android:id="@+id/cookiePath"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:hint="@string/cookie_item_path"
+        android:importantForAutofill="no"
+        android:inputType="text" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:text="@string/cookie_item_domain_path_hint"
+        android:textSize="12sp" />
+
+</LinearLayout>

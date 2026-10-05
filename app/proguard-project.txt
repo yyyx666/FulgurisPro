@@ -109,6 +109,7 @@
 -keep class com.anthonycr.mezzanine._Mezzanine_BookmarkPageReader { *; }
 -keep class com.anthonycr.mezzanine._Mezzanine_IncognitoPageReader { *; }
 -keep class com.anthonycr.mezzanine._Mezzanine_ListPageReader { *; }
+-keep class com.anthonycr.mezzanine._Mezzanine_HistoryPageReader { *; }
 -keep class com.anthonycr.mezzanine._Mezzanine_InvertPage { *; }
 -keep class com.anthonycr.mezzanine._Mezzanine_SetMetaViewport { *; }
 -keep class com.anthonycr.mezzanine._Mezzanine_TextReflow { *; }
@@ -142,6 +143,7 @@
     public static com.anthonycr.mezzanine._Mezzanine_IncognitoPageReader providesIncognitoPageReader();
     public static com.anthonycr.mezzanine._Mezzanine_InvertPage providesInvertPage();
     public static com.anthonycr.mezzanine._Mezzanine_ListPageReader providesListPageReader();
+    public static com.anthonycr.mezzanine._Mezzanine_HistoryPageReader providesHistoryPageReader();
     public static com.anthonycr.mezzanine._Mezzanine_SetMetaViewport providesSetMetaViewport();
     public static com.anthonycr.mezzanine._Mezzanine_TextReflow providesTextReflow();
 }

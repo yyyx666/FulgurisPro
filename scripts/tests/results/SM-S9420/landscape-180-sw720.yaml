@@ -1,0 +1,48 @@
+# Fulguris UI test run — SM-S9420 · landscape-180-sw720
+timestamp: '2026-10-05T17:40:48+00:00'
+device:
+  model: SM-S9420
+  brand: Samsung
+  product_name: SM-S9420
+  android: '14'
+config:
+  id: landscape-180-sw720
+  orientation: landscape
+  rotation: 180
+  smallest_width_dp: 720
+package: net.slions.fulguris.full.agent.debug
+options:
+  restart: false
+  keep_tabs: false
+  orientation: null
+  test_filter: null
+  group: advanced
+summary:
+  passed: 3
+  failed: 2
+  total: 5
+  ran: 5
+  duration_s: 195.1
+tests:
+- name: test_close_tab_entry_closes_the_current_tab
+  status: fail
+  duration_s: 44.1
+  message: 'the Close tab entry should be in the tab menu out of the box (it used to hide behind the menu settings); menu items: ['''', ''header'', ''layoutMenuItems'', ''layoutMenuItemsContainer'', ''menuItemAddBookmark'', ''menuItemConsole'', ''menuItemDarkMode'', ''menuItemDesktopMode'', ''menuItemDomainSettings'', ''menuItemFind'', ''menuItemMainMenu'', ''menuItemPageHistory'', ''menuItemPageRequests'', ''menuItemPrint'', ''menuItemReaderMode'', ''menuItemShare'', ''menuItemStorage'', ''menuItemTranslate'', ''menuShortcutBack'', ''menuShortcutForward'', ''menuShortcutHome'', ''menuShortcutRefresh'', ''scrollViewItems'']'
+  ran: true
+- name: test_console_repl_evaluates_expression
+  status: pass
+  duration_s: 40.3
+  ran: true
+- name: test_storage_sheet_lists_local_storage
+  status: pass
+  duration_s: 28.9
+  ran: true
+- name: test_requests_sheet_lists_requests_with_details
+  status: fail
+  duration_s: 51.3
+  message: 'the request detail should report the GET method (nodes: ['''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', '''', ''请求详情'', ''http'', '''', '''', '''', '''', ''打开'', ''http://localhost:8899/advanced_target.html?cb=1791221969524'', '''', '''', ''状态'', '''', '''', '''', '''', ''已允许'', '''', '''', ''URL'', '''', '''', '''', '''', ''复制'', ''59 个字符'', '''', '''', ''URL'', ''http://localhost:8899/advanced_target.html?cb=1791221969524'', '''', '''', ''域名'', ''localhost'', '''', '''', ''路径'', ''/advanced_target.html'', '''', '''', ''参数'', '''', '''', ''cb''])'
+  ran: true
+- name: test_history_page_groups_dates_and_shows_icons
+  status: pass
+  duration_s: 25.6
+  ran: true

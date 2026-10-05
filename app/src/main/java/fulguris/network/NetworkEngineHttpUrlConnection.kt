@@ -51,44 +51,77 @@ class NetworkEngineHttpUrlConnection : NetworkEngine {
                 return null
             }
 
-            val urlString = request.url.toString()
+            var urlString = request.url.toString()
+            var responseCode = 0
 
-            // Open connection
-            val url = URL(urlString)
-            connection = url.openConnection() as HttpURLConnection
+            for (hop in 0..MAX_REDIRECTS) {
 
-            // Set request method (GET/HEAD/DELETE/OPTIONS)
-            connection.requestMethod = request.method
+                // Open connection
+                val current = URL(urlString).openConnection() as HttpURLConnection
+                connection = current
 
-            // Set timeouts
-            connection.connectTimeout = 10000 // 10 seconds
-            connection.readTimeout = 30000 // 30 seconds
+                // Set request method (GET/HEAD/DELETE/OPTIONS)
+                current.requestMethod = request.method
 
-            // Set whether to follow redirects
-            connection.instanceFollowRedirects = true
+                // Set timeouts
+                current.connectTimeout = 10000 // 10 seconds
+                current.readTimeout = 30000 // 30 seconds
 
-            // Copy headers from WebResourceRequest
-            request.requestHeaders?.forEach { (key, value) ->
-                connection.setRequestProperty(key, value)
+                // We follow redirects ourselves, see below
+                current.instanceFollowRedirects = false
+
+                // Copy headers from WebResourceRequest
+                request.requestHeaders?.forEach { (key, value) ->
+                    current.setRequestProperty(key, value)
+                }
+
+                // WebView does not give us the cookies of the request it asked us to load, our
+                // interception running before its network stack attaches them
+                cookiesFor(urlString)?.let { current.setRequestProperty("Cookie", it) }
+
+                // Connect and get response
+                current.connect()
+                responseCode = current.responseCode
+
+                // Follow redirects ourselves: HttpURLConnection would replay every header of ours,
+                // cookies included, on whatever host the redirect points at, and cookies are host
+                // scoped. Asking for them one hop at a time also means the cookies a hop sets are
+                // there for the next one, which login flows rely on.
+                val location = if (responseCode in 300..399) current.getHeaderField("Location") else null
+                val redirectUrl = location?.let { absoluteUrl(urlString, it) }
+                if (redirectUrl == null) {
+                    // Not a redirect, or one we are not meant to follow: that response is our
+                    // response
+                    break
+                }
+                if (hop == MAX_REDIRECTS) {
+                    Timber.w("HttpURLConnection giving up after $MAX_REDIRECTS redirects: $urlString")
+                    break
+                }
+
+                // Cookies set on the way belong to the host we are leaving
+                processCookies(urlString, current.headerFields["Set-Cookie"].orEmpty().filterNotNull())
+                current.disconnect()
+                connection = null
+                urlString = redirectUrl
             }
 
-            // Connect and get response
-            connection.connect()
+            // We now hold the response of the last hop
+            val conn = connection ?: return null
 
-            val responseCode = connection.responseCode
             if (responseCode < 200 || responseCode >= 400) {
                 Timber.w("HttpURLConnection request failed: $responseCode ${request.url}")
                 return null // Let WebView handle failures
             }
 
             // Extract response data
-            val contentType = connection.contentType
+            val contentType = conn.contentType
             val encoding = contentType?.let { extractCharset(it) } ?: "UTF-8"
             val mimeType = contentType?.let { extractMimeType(it) } ?: "text/plain"
 
             // Build response headers map
             val responseHeaders = mutableMapOf<String, String>()
-            connection.headerFields.forEach { (key, values) ->
+            conn.headerFields.forEach { (key, values) ->
                 // Skip null keys (status line) and empty value lists
                 if (key != null && values.isNotEmpty()) {
                     responseHeaders[key] = values.joinToString(", ")
@@ -97,21 +130,22 @@ class NetworkEngineHttpUrlConnection : NetworkEngine {
 
             // Get input stream
             val inputStream = try {
-                connection.inputStream
+                conn.inputStream
             } catch (e: Exception) {
                 // If we can't get the input stream, return empty response
                 ByteArrayInputStream(ByteArray(0))
             }
 
             // Process Set-Cookie headers using base interface method
-            val setCookieHeaders = connection.headerFields["Set-Cookie"]
+            // Those belong to the URL we ended up on, not to the one we were asked for
+            val setCookieHeaders = conn.headerFields["Set-Cookie"]
             if (!setCookieHeaders.isNullOrEmpty()) {
-                processCookies(request.url.toString(), setCookieHeaders.filterNotNull())
+                processCookies(urlString, setCookieHeaders.filterNotNull())
             }
 
             // Create WebResourceResponse
             // HTTP/2 responses may have empty message, but Android requires non-empty reason phrase
-            val reasonPhrase = connection.responseMessage?.ifEmpty { getDefaultReasonPhrase(responseCode) }
+            val reasonPhrase = conn.responseMessage?.ifEmpty { getDefaultReasonPhrase(responseCode) }
                 ?: getDefaultReasonPhrase(responseCode)
 
             return WebResourceResponse(
@@ -151,6 +185,33 @@ class NetworkEngineHttpUrlConnection : NetworkEngine {
             .firstOrNull { it.startsWith("charset=", ignoreCase = true) }
             ?.substringAfter("=")
             ?.trim()
+    }
+}
+
+/**
+ * How many redirect hops [NetworkEngineHttpUrlConnection] follows before handing the last response
+ * of the chain to WebView. Matches what OkHttp allows our other engine.
+ */
+private const val MAX_REDIRECTS = 20
+
+/**
+ * Absolute URL [location] points at from [from], null when it is not a redirect we may follow.
+ *
+ * A Location is usually relative, it then resolves against the URL that provided it.
+ */
+internal fun absoluteUrl(from: String, location: String): String? {
+    return try {
+        val url = URL(URL(from), location)
+        val scheme = url.protocol
+        if (scheme.equals("http", ignoreCase = true) || scheme.equals("https", ignoreCase = true)) {
+            url.toString()
+        } else {
+            // Something like javascript: or mailto:, not ours to follow
+            null
+        }
+    } catch (e: Exception) {
+        // A Location we cannot make sense of, let WebView deal with it
+        null
     }
 }
 

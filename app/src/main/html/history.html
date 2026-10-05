@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html xmlns=http://www.w3.org/1999/xhtml>
+
+<head>
+    <meta content=en-us http-equiv=Content-Language />
+    <meta content='text/html; charset=utf-8' http-equiv=Content-Type />
+    <meta name=viewport content='width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no'>
+    <title>${pageTitle}</title>
+</head>
+<style>
+    body,
+    html {
+        margin: 0px;
+        padding: 0px;
+        background-color: ${backgroundColor};
+    }
+
+    #searchBar {
+        position: sticky;
+        top: 0px;
+        padding: 8px 12px;
+        background-color: ${backgroundColor};
+        border-bottom: 1px solid ${dividerColor};
+        z-index: 2;
+    }
+
+    #searchInput {
+        width: 100%;
+        box-sizing: border-box;
+        padding: 8px 12px;
+        font-family: Arial;
+        font-size: 16px;
+        color: ${textColor};
+        background-color: ${backgroundColor};
+        border: 1px solid ${dividerColor};
+        border-radius: 20px;
+        outline: none;
+    }
+
+    .box {
+        vertical-align: middle;
+        position: relative;
+        display: block;
+        margin: 0px;
+        padding-left: 52px;
+        padding-right: 2px;
+        padding-top: 9px;
+        padding-bottom: 9px;
+        margin-left: 12px;
+        margin-right: 12px;
+        background-color: ${backgroundColor};
+        border-bottom: 1px solid ${dividerColor};
+        font-family: Arial;
+        color: #444;
+        font-size: 12px;
+    }
+
+    .box a {
+        width: 100%;
+        height: 100%;
+        position: absolute;
+        left: 0;
+        top: 0;
+    }
+
+    .entryIcon {
+        position: absolute;
+        left: 10px;
+        top: 50%;
+        transform: translateY(-50%);
+        -webkit-transform: translateY(-50%);
+        width: 32px;
+        height: 32px;
+    }
+
+    .entryTitle {
+        color: ${textColor};
+        font-size: 22px;
+        font-family: Arial;
+        white-space: nowrap;
+        overflow: hidden;
+        margin: auto;
+        text-overflow: ellipsis;
+        -o-text-overflow: ellipsis;
+        -ms-text-overflow: ellipsis;
+    }
+
+    .entryUrl {
+        color: ${secondaryTextColor};
+        font-size: 16px;
+        font-family: Arial;
+        white-space: nowrap;
+        overflow: hidden;
+        margin: auto;
+        text-overflow: ellipsis;
+        -o-text-overflow: ellipsis;
+        -ms-text-overflow: ellipsis;
+    }
+
+    .dateHeader {
+        margin: 0px 12px;
+        padding: 14px 0px 4px 0px;
+    }
+
+    .dateTitle {
+        color: ${secondaryTextColor};
+        font-size: 14px;
+        font-family: Arial;
+        font-weight: bold;
+        margin: 0px;
+    }
+
+</style>
+
+<body>
+    <div id="searchBar">
+        <input id="searchInput" type="text" placeholder="${searchHint}" autocomplete="off"
+               autocorrect="off" autocapitalize="off" spellcheck="false" />
+    </div>
+    <div id="content">
+
+        <div id=repeated class=box>
+            <a href='${URL}'></a>
+            <img id='icon' class='entryIcon' />
+            <p id='title' class='entryTitle'>${TITLE}</p>
+            <p id='url' class='entryUrl'>${URL}</p>
+        </div>
+
+        <div id='groupHeader' class='dateHeader'><p id='groupTitle' class='dateTitle'></p></div>
+
+    </div>
+
+    <script>
+        (function () {
+            var input = document.getElementById('searchInput');
+            if (!input) { return; }
+
+            function apply() {
+                var query = input.value.trim().toLowerCase();
+                var boxes = document.querySelectorAll('#content .box');
+                for (var i = 0; i < boxes.length; i++) {
+                    var text = boxes[i].textContent.toLowerCase();
+                    boxes[i].style.display = (query === '' || text.indexOf(query) !== -1) ? '' : 'none';
+                }
+
+                // Hide day headers whose entries are all filtered out.
+                var headers = document.querySelectorAll('#content .dateHeader');
+                for (var h = 0; h < headers.length; h++) {
+                    var header = headers[h];
+                    var node = header.nextElementSibling;
+                    var anyVisible = false;
+                    while (node && !node.classList.contains('dateHeader')) {
+                        if (node.classList.contains('box') && node.style.display !== 'none') {
+                            anyVisible = true;
+                            break;
+                        }
+                        node = node.nextElementSibling;
+                    }
+                    header.style.display = anyVisible ? '' : 'none';
+                }
+            }
+
+            input.addEventListener('input', apply);
+        })();
+    </script>
+</body>
+
+</html>

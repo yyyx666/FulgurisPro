@@ -50,9 +50,9 @@ class TabViewHolder(
     }
 
     override fun onLongClick(v: View): Boolean {
-        //uiController.showCloseDialog(adapterPosition)
-        //return true
-        return false
+        // Offer per tab close options (close / close others / close all)
+        webBrowser.showCloseDialog(adapterPosition)
+        return true
     }
 
     // From ItemTouchHelperViewHolder

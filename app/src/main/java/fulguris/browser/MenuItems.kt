@@ -262,6 +262,10 @@ object MenuItems {
             canBeInTabMenu = true,
             defaultMenu = MenuType.TabMenu
         ),
+        // Our inspector panels (console, network, storage, cookies) used to hide behind the menu
+        // settings. Those are unwired by default, which effectively made them unreachable for the
+        // users who asked for them, we thus expose them out of the box next to our other per tab
+        // actions. Users disliking the longer menu can still hide them again from our settings.
         MenuItemId.Requests to MenuItem(
             id = MenuItemId.Requests,
             labelId = R.string.action_page_requests,
@@ -269,8 +273,7 @@ object MenuItems {
             viewId = R.id.menuItemPageRequests,
             canBeInMainMenu = true,
             canBeInTabMenu = true,
-            defaultMenu = MenuType.HiddenMenu,
-            preferredMenu = MenuType.TabMenu
+            defaultMenu = MenuType.TabMenu
         ),
         MenuItemId.Console to MenuItem(
             id = MenuItemId.Console,
@@ -279,8 +282,7 @@ object MenuItems {
             viewId = R.id.menuItemConsole,
             canBeInMainMenu = true,
             canBeInTabMenu = true,
-            defaultMenu = MenuType.HiddenMenu,
-            preferredMenu = MenuType.TabMenu
+            defaultMenu = MenuType.TabMenu
         ),
         MenuItemId.Cookies to MenuItem(
             id = MenuItemId.Cookies,
@@ -291,6 +293,26 @@ object MenuItems {
             canBeInTabMenu = true,
             defaultMenu = MenuType.HiddenMenu,
             preferredMenu = MenuType.TabMenu
+        ),
+        MenuItemId.Storage to MenuItem(
+            id = MenuItemId.Storage,
+            labelId = R.string.action_storage,
+            iconId = R.drawable.ic_storage_outline,
+            viewId = R.id.menuItemStorage,
+            canBeInMainMenu = true,
+            canBeInTabMenu = true,
+            defaultMenu = MenuType.TabMenu
+        ),
+        MenuItemId.CloseTab to MenuItem(
+            id = MenuItemId.CloseTab,
+            labelId = R.string.close_tab,
+            iconId = R.drawable.ic_action_delete,
+            viewId = R.id.menuItemCloseTab,
+            canBeInMainMenu = true,
+            canBeInTabMenu = true,
+            // Unlike our inspector panels closing a tab is a basic action, we thus expose it
+            // out of the box next to our other per tab actions (domain settings, print, …)
+            defaultMenu = MenuType.TabMenu
         ),
         MenuItemId.AddToHome to MenuItem(
             id = MenuItemId.AddToHome,

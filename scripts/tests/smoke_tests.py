@@ -30,14 +30,14 @@ def _node_texts(device) -> set[str]:
     return {n.text for n in device.nodes() if n.text}
 
 
-def _wait_for_node_text(device, text: str, timeout: float = 15.0) -> bool:
-    """Poll the UI hierarchy until a node shows ``text`` (or the timeout elapses)."""
+def _wait_for_node(device, id_suffix: str, timeout: float = 15.0):
+    """Poll the UI hierarchy until the node whose resource-id ends with ``id_suffix`` appears."""
     deadline = time.time() + timeout
-    while time.time() < deadline:
-        if text in _node_texts(device):
-            return True
+    node = device.find_node(id_suffix)
+    while time.time() < deadline and node is None:
         time.sleep(0.5)
-    return text in _node_texts(device)
+        node = device.find_node(id_suffix)
+    return node
 
 
 def test_smoke_launch(device, ctx: dict) -> None:
@@ -67,7 +67,10 @@ def test_smoke_open_settings(device, ctx: dict) -> None:
         "settings activity crashed or did not come to the foreground "
         f"(top: {device.foreground_package()!r})"
     )
-    assert _wait_for_node_text(device, "Settings"), (
+    # The settings screen is a long list of localized entries, so we assert on the
+    # activity's own container view (activity_settings.xml) rather than on any of
+    # its strings: those are translated and would tie us to the device locale.
+    assert _wait_for_node(device, ":id/settings") is not None, (
         f"settings screen did not render (nodes: {sorted(_node_texts(device))[:40]!r})"
     )
     device.key(keys.BACK, wait=1.5)  # back to the browser (parent activity)

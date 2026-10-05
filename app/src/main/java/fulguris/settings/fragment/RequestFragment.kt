@@ -22,12 +22,30 @@
 
 package fulguris.settings.fragment
 
+import android.graphics.BitmapFactory
+import android.graphics.Typeface
 import android.net.Uri
 import android.os.Bundle
+import android.text.TextUtils
 import android.text.format.DateFormat
+import android.text.format.Formatter
+import android.util.TypedValue
+import android.view.View
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.ScrollView
+import android.widget.TextView
 import androidx.preference.PreferenceCategory
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
 import fulguris.R
+import fulguris.activity.WebBrowserActivity
+import fulguris.extensions.onConfigurationChange
+import fulguris.network.CapturedBody
+import fulguris.utils.BodyKind
+import fulguris.utils.Utils
+import fulguris.utils.formatBody
+import fulguris.utils.hexDump
 import java.util.Date
 
 /**
@@ -47,8 +65,282 @@ class RequestFragment : AbstractSettingsFragment() {
         val url = arguments?.getString("url") ?: ""
         val wasBlocked = arguments?.getBoolean("was_blocked", false) ?: false
         val timestamp = arguments?.getLong("timestamp", 0L) ?: 0L
+        val method = arguments?.getString("method") ?: ""
+        val isMainFrame = arguments?.getBoolean("is_main_frame", false) ?: false
+        val resourceType = arguments?.getString("resource_type")
+        val statusCode = arguments?.getInt("status_code", -1) ?: -1
+        val mimeType = arguments?.getString("mime_type")
+        val durationMs = arguments?.getLong("duration_ms", -1L) ?: -1L
+        val requestHeaders = arguments?.getStringArrayList("request_headers") ?: arrayListOf()
+        val bodyId = arguments?.getLong("body_id", -1L) ?: -1L
+        val bodySize = arguments?.getLong("body_size", -1L) ?: -1L
+        val bodyTruncated = arguments?.getBoolean("body_truncated", false) ?: false
 
         populateRequestDetails(url, wasBlocked, timestamp)
+        populateNetworkDetails(method, isMainFrame, resourceType, statusCode, mimeType, durationMs, requestHeaders)
+        populateResponseBody(bodyId, bodySize, bodyTruncated, method, statusCode, mimeType)
+    }
+
+    /**
+     * Populate our response body section.
+     *
+     * We only ever capture a body from an engine that handled the request, see
+     * `WebPageClient.captureResponseBody`. So when we have none we tell the user why instead of
+     * pretending there is nothing to see.
+     */
+    private fun populateResponseBody(
+        bodyId: Long,
+        bodySize: Long,
+        bodyTruncated: Boolean,
+        method: String,
+        statusCode: Int,
+        mimeType: String?
+    ) {
+        val category = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_body)
+            isIconSpaceReserved = false
+        }
+        preferenceScreen.addPreference(category)
+
+        val body = (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.webPageClient?.getResponseBody(bodyId)
+
+        if (body == null) {
+            category.addPreference(x.Preference(requireContext()).apply {
+                summary = getString(
+                    if (isBodylessRequestMethod(method) && statusCode < 0) {
+                        R.string.request_body_unavailable_method
+                    } else {
+                        R.string.request_body_unavailable_webview
+                    }
+                )
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+            return
+        }
+
+        val formatted = formatBody(body.bytes, mimeType)
+
+        category.addPreference(x.Preference(requireContext()).apply {
+            title = getString(
+                when (formatted.kind) {
+                    BodyKind.IMAGE -> R.string.request_body_preview_image
+                    BodyKind.BINARY -> R.string.request_body_raw
+                    else -> R.string.request_body_view
+                }
+            )
+            if (formatted.kind == BodyKind.JSON) {
+                summary = getString(R.string.request_body_json)
+            }
+            isIconSpaceReserved = true
+            setIcon(
+                when (formatted.kind) {
+                    BodyKind.IMAGE -> R.drawable.ic_image
+                    BodyKind.BINARY -> R.drawable.ic_unknown_document_outline
+                    else -> R.drawable.ic_code
+                }
+            )
+            setOnPreferenceClickListener {
+                showResponseBody(body, formatted.kind, formatted.text)
+                true
+            }
+        })
+
+        category.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_body_size)
+            summary = buildSizeSummary(bodySize, bodyTruncated)
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+    }
+
+    /**
+     * Summarize the size of the body we hold, saying so when we only kept a prefix of it.
+     */
+    private fun buildSizeSummary(bodySize: Long, bodyTruncated: Boolean): String {
+        val size = if (bodySize >= 0) {
+            Formatter.formatFileSize(requireContext(), bodySize)
+        } else {
+            getString(R.string.request_unknown_value)
+        }
+        return if (bodyTruncated) {
+            getString(R.string.request_body_truncated, size)
+        } else {
+            size
+        }
+    }
+
+    /**
+     * Show the captured body in a dialog, formatted the way [kind] calls for.
+     */
+    private fun showResponseBody(body: CapturedBody, kind: BodyKind, text: String?) {
+        val content: View = if (kind == BodyKind.IMAGE) {
+            buildImageView(body)
+        } else {
+            buildTextView(if (kind == BodyKind.BINARY) hexDump(body.bytes) else text.orEmpty())
+        }
+
+        val dialog = MaterialAlertDialogBuilder(requireContext())
+            .setTitle(
+                if (kind == BodyKind.IMAGE) {
+                    getString(R.string.request_body_preview_image)
+                } else {
+                    getString(R.string.request_body)
+                }
+            )
+            .setView(content)
+            .setPositiveButton(R.string.action_ok, null)
+            .create()
+
+        // Our content was built for the current configuration, dismiss the dialog when it changes
+        content.onConfigurationChange { dialog.dismiss() }
+
+        dialog.show()
+    }
+
+    /**
+     * A scrollable, selectable, monospace view of a body.
+     */
+    private fun buildTextView(content: String): View {
+        val padding = resources.getDimensionPixelSize(R.dimen.dialog_padding)
+        val view = TextView(requireContext()).apply {
+            text = content
+            setTextIsSelectable(true)
+            typeface = Typeface.MONOSPACE
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+            setPadding(padding, padding, padding, padding)
+        }
+        return ScrollView(requireContext()).apply {
+            addView(view)
+        }
+    }
+
+    /**
+     * An image view sized to the screen, decoding only as much of the body as we can display.
+     */
+    private fun buildImageView(body: CapturedBody): View {
+        val options = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeByteArray(body.bytes, 0, body.bytes.size, options)
+
+        val metrics = resources.displayMetrics
+        options.inJustDecodeBounds = false
+        options.inSampleSize = Utils.calculateInSampleSize(options, metrics.widthPixels, metrics.heightPixels)
+
+        val bitmap = BitmapFactory.decodeByteArray(body.bytes, 0, body.bytes.size, options)
+
+        val imageView = ImageView(requireContext()).apply {
+            setImageBitmap(bitmap)
+            adjustViewBounds = true
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            contentDescription = getString(R.string.request_body_preview_image)
+        }
+
+        val padding = resources.getDimensionPixelSize(R.dimen.dialog_padding)
+        return LinearLayout(requireContext()).apply {
+            setPadding(padding, padding, padding, padding)
+            addView(imageView)
+        }
+    }
+
+    /**
+     * Methods WebView handles itself, we therefore never get a response body for them.
+     * See `NetworkEngine.canHandleRequest`.
+     */
+    private fun isBodylessRequestMethod(method: String): Boolean =
+        method.equals("POST", ignoreCase = true) ||
+                method.equals("PUT", ignoreCase = true) ||
+                method.equals("PATCH", ignoreCase = true)
+
+    /**
+     * Populate our network section with whatever the network layer was able to report.
+     * Response side information is only available when an engine handled the request.
+     */
+    private fun populateNetworkDetails(
+        method: String,
+        isMainFrame: Boolean,
+        resourceType: String?,
+        statusCode: Int,
+        mimeType: String?,
+        durationMs: Long,
+        requestHeaders: List<String>
+    ) {
+        val unknown = getString(R.string.request_unknown_value)
+
+        val networkCategory = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_network)
+            isIconSpaceReserved = false
+        }
+        preferenceScreen.addPreference(networkCategory)
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_method)
+            summary = if (method.isEmpty()) unknown else method
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_type)
+            summary = when {
+                isMainFrame -> getString(R.string.request_main_frame)
+                resourceType != null -> resourceType
+                else -> unknown
+            }
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_status)
+            summary = if (statusCode >= 0) statusCode.toString() else unknown
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_mime)
+            summary = mimeType ?: unknown
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_duration)
+            summary = if (durationMs >= 0) {
+                getString(R.string.request_duration_value, durationMs)
+            } else {
+                unknown
+            }
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        val headersCategory = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_headers)
+            isIconSpaceReserved = false
+        }
+        preferenceScreen.addPreference(headersCategory)
+
+        if (requestHeaders.isEmpty()) {
+            headersCategory.addPreference(x.Preference(requireContext()).apply {
+                summary = getString(R.string.request_headers_none)
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+            return
+        }
+
+        requestHeaders.forEach { header ->
+            headersCategory.addPreference(x.Preference(requireContext()).apply {
+                title = header.substringBefore(':')
+                summary = header.substringAfter(':').trim()
+                isSingleLineSummary = true
+                summaryEllipsize = android.text.TextUtils.TruncateAt.MIDDLE
+                isIconSpaceReserved = false
+                isCopyingEnabled = true
+                isSelectable = false
+            })
+        }
     }
 
     /**

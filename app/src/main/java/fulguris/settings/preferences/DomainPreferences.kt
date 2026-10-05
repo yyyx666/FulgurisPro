@@ -26,6 +26,9 @@ import fulguris.app
 import fulguris.R
 import fulguris.extensions.originToDomain
 import fulguris.extensions.reverseDomainName
+import fulguris.network.CustomHeader
+import fulguris.network.customHeaderMap
+import fulguris.network.parseCustomHeaders
 import fulguris.settings.NoYesAsk
 import fulguris.enums.IncomingUrlAction
 import android.annotation.SuppressLint
@@ -35,6 +38,7 @@ import android.content.SharedPreferences
 import androidx.preference.PreferenceManager
 import fulguris.settings.preferences.delegates.booleanPreference
 import fulguris.settings.preferences.delegates.enumPreference
+import fulguris.settings.preferences.delegates.stringPreference
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import timber.log.Timber
 import java.io.File
@@ -204,6 +208,25 @@ class DomainPreferences constructor(
 
 
     /**
+     * Custom request headers for this domain, as the user typed them in our editor.
+     *
+     * Deliberately not inherited from our parent: sending a domain's secret header to its
+     * subdomains, which may well be third-party hosted, would be a nasty surprise.
+     */
+    var customRequestHeaders by preferences.stringPreference(R.string.pref_key_custom_headers, "")
+
+    /**
+     * Custom request headers of this domain, in the order the user wrote them.
+     */
+    val customHeaders: List<CustomHeader> get() = parseCustomHeaders(customRequestHeaders)
+
+    /**
+     * Custom request headers as a map, to apply on top of the headers of a request.
+     */
+    val customHeadersMap: Map<String, String> get() = customHeaderMap(customHeaders)
+
+
+    /**
      * Is this the default domain settings?
      */
     val isDefault: Boolean get() = domain.isEmpty()
@@ -230,7 +253,8 @@ class DomainPreferences constructor(
                darkModeOverride ||
                launchAppOverride ||
                sslErrorOverride ||
-               incomingUrlActionOverride
+               incomingUrlActionOverride ||
+               customRequestHeaders.isNotEmpty()
     }
 
     /**
@@ -279,6 +303,9 @@ class DomainPreferences constructor(
             }
             if (incomingUrlActionOverride) {
                 overrides.add(context.getString(R.string.pref_title_incoming_url_action))
+            }
+            if (customRequestHeaders.isNotEmpty()) {
+                overrides.add(context.getString(R.string.pref_title_custom_headers))
             }
         }
 
