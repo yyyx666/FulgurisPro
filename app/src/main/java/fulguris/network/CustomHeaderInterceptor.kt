@@ -58,7 +58,7 @@ class CustomHeaderInterceptor(
      * Called from `shouldInterceptRequest`, thus from a background thread where blocking I/O is
      * expected: that is the whole point of the hook.
      */
-    fun intercept(request: WebResourceRequest, customHeaders: Map<String, String>): WebResourceResponse? {
+    fun intercept(request: WebResourceRequest, customHeaders: Map<String, String>): Intercepted? {
         if (!canIntercept(request, customHeaders)) {
             return null
         }
@@ -93,13 +93,17 @@ class CustomHeaderInterceptor(
 
             Timber.v("Custom headers: ${response.code} $url")
 
-            WebResourceResponse(
-                contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() } ?: "text/plain",
-                contentType?.charsetOf() ?: "UTF-8",
-                response.code,
-                response.message.ifEmpty { defaultReasonPhrase(response.code) },
-                responseHeaders,
-                response.body?.byteStream() ?: ByteArrayInputStream(ByteArray(0))
+            Intercepted(
+                WebResourceResponse(
+                    contentType?.substringBefore(';')?.trim()?.takeIf { it.isNotEmpty() } ?: "text/plain",
+                    contentType?.charsetOf() ?: "UTF-8",
+                    response.code,
+                    response.message.ifEmpty { defaultReasonPhrase(response.code) },
+                    responseHeaders,
+                    response.body?.byteStream() ?: ByteArrayInputStream(ByteArray(0))
+                ),
+                // WebView reported its own headers, these are the ones that actually went out
+                headers
             )
         } catch (e: Exception) {
             // Best effort: better a request without our headers than no resource at all
@@ -138,6 +142,17 @@ class CustomHeaderInterceptor(
         private fun sharedClient(): OkHttpClient = SharedClient.client
     }
 }
+
+/**
+ * What [CustomHeaderInterceptor.intercept] got back, along with the headers it actually sent.
+ *
+ * The network panel is here to show what went over the wire, and the headers we add are merged in
+ * after WebView reported its own, so the two have to travel back together.
+ */
+data class Intercepted(
+    val response: WebResourceResponse,
+    val sentHeaders: Map<String, String>
+)
 
 /**
  * Reads and writes the cookies of a request.

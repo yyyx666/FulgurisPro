@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">لا يمكن سحب ألواح التبويبات والإشارات المرجعية</string>
     <string name="pref_title_use_bottom_sheets">استخدام الأوراق السفلية</string>
     <string name="pref_summary_use_bottom_sheets">يتم عرض التبويبات والإشارات المرجعية في أوراق سفلية بدلاً من أدراج جانبية</string>
-    <string name="pref_title_tab_list_item_show_close_button">إظهار زر إغلاق التبويب</string>
-    <string name="pref_summary_tab_list_item_show_close_button">عرض أزرار إغلاق التبويب على عناصر قائمة التبويبات</string>
     <string name="pref_title_crash_report">تقارير التعطل</string>
     <string name="pref_title_analytics">التحليلات</string>
     <string name="pref_title_pull_to_refresh">اسحب للتحديث</string>

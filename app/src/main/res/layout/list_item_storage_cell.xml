@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ One cell of the records table: what a record holds for one of its fields. Its width is set by
+ RowAdapter, one column's worth and the same in every row, so that a column lines up down the table
+ and the table scrolls sideways rather than squeezing its columns.
+
+ A cell is a touch target of its own, so it gets its own press feedback: the row behind it no longer
+ shows any, its touches being eaten by the cell that was tapped.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/storageCell"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:ellipsize="end"
+    android:maxLines="2"
+    android:paddingEnd="@dimen/material_grid_unit"
+    android:textSize="12sp" />

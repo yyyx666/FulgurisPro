@@ -13,7 +13,9 @@
         a:allCapsTitle="true"
         tools:ignore="PrivateResource" />
 
-    <!-- Request details will be dynamically populated -->
+    <!-- RequestTabsPreference and the request or response details are added in code, see
+         RequestFragment: the tabs need their callback wired and the details depend on which of the
+         two halves we are showing. -->
 
 </androidx.preference.PreferenceScreen>
 

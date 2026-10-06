@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Las pestañas y los paneles de marcadores no pueden ser arrastrados</string>
     <string name="pref_title_use_bottom_sheets">Usar hojas inferiores</string>
     <string name="pref_summary_use_bottom_sheets">Las pestañas y marcadores se muestran en las hojas inferiores en lugar de los cajones laterales</string>
-    <string name="pref_title_tab_list_item_show_close_button">Mostrar botón de cerrar pestaña</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Mostrar botones de cierre en los elementos de la lista de pestañas</string>
     <string name="pref_title_crash_report">Informes de fallos</string>
     <string name="pref_title_analytics">Analíticas</string>
     <string name="pref_title_pull_to_refresh">Tirar para actualizar</string>

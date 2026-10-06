@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Kartice i table sa obeleživačima ne mogu da se prevlače</string>
     <string name="pref_title_use_bottom_sheets">Koristite donje listove</string>
     <string name="pref_summary_use_bottom_sheets">Kartice i obeleživači su prikazani u donjim listovima umesto u bočnim fiokama</string>
-    <string name="pref_title_tab_list_item_show_close_button">Prikaži dugme za zatvaranje kartice</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Prikažite dugmad za zatvaranje kartica na stavkama liste kartica</string>
     <string name="pref_title_crash_report">Izveštaji o padovima</string>
     <string name="pref_title_analytics">Analitika</string>
     <string name="pref_title_pull_to_refresh">Povucite da biste osvežili</string>

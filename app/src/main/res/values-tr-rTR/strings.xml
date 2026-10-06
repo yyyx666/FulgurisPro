@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Sekmeler ve Yer İmleri panelleri sürüklenemez</string>
     <string name="pref_title_use_bottom_sheets">Alt panelleri kullan</string>
     <string name="pref_summary_use_bottom_sheets">Sekmeler ve Yer İmleri yan paneller yerine alt panellerde gösterilir</string>
-    <string name="pref_title_tab_list_item_show_close_button">Sekme kapatma düğmesini göster</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Sekme listesi öğelerinde sekme kapatma düğmelerini göster</string>
     <string name="pref_title_crash_report">Çökme raporları</string>
     <string name="pref_title_analytics">Analitik</string>
     <string name="pref_title_pull_to_refresh">Yenilemek için çek</string>

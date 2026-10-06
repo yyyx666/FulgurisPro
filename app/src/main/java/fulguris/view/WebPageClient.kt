@@ -140,6 +140,8 @@ class WebPageClient(
         val statusCode: Int? = null,
         val mimeType: String? = null,
         val requestHeaders: Map<String, String> = emptyMap(),
+        // Headers of the response, only known when an engine handled the request
+        val responseHeaders: Map<String, String> = emptyMap(),
         val durationMs: Long? = null,
         // Handle of the captured response body in [responseBodies], null when we captured none
         val bodyId: Long? = null,
@@ -178,12 +180,17 @@ class WebPageClient(
 
     /**
      * Complete a tracked request with what we learned from the response of an engine.
+     *
+     * [sentHeaders] replaces the headers WebView reported with the ones we actually put on the wire,
+     * when we know them: the network panel is here to show what the network saw, and our custom
+     * headers are added after WebView reported its own.
      */
     private fun updatePageRequestResponse(
         request: PageRequest,
         response: WebResourceResponse,
         durationMs: Long,
-        captured: Pair<Long, CapturedBody>? = null
+        captured: Pair<Long, CapturedBody>? = null,
+        sentHeaders: Map<String, String>? = null
     ) {
         synchronized(pageRequests) {
             val index = pageRequests.indexOf(request)
@@ -191,7 +198,9 @@ class WebPageClient(
                 pageRequests[index] = request.copy(
                     statusCode = response.statusCode,
                     mimeType = response.mimeType,
+                    responseHeaders = response.responseHeaders.orEmpty(),
                     durationMs = durationMs,
+                    requestHeaders = sentHeaders ?: request.requestHeaders,
                     bodyId = captured?.first,
                     bodySize = captured?.second?.size?.toLong(),
                     bodyTruncated = captured?.second?.truncated == true
@@ -436,9 +445,15 @@ class WebPageClient(
             val intercepted = customHeaderInterceptor.intercept(request, customHeaders)
             if (intercepted != null) {
                 Timber.v("$ihs : Request handled with custom headers: ${request.url}")
-                val captured = captureResponseBody(intercepted)
-                updatePageRequestResponse(trackedRequest, intercepted, System.currentTimeMillis() - startTime, captured)
-                return intercepted
+                val captured = captureResponseBody(intercepted.response)
+                updatePageRequestResponse(
+                    trackedRequest,
+                    intercepted.response,
+                    System.currentTimeMillis() - startTime,
+                    captured,
+                    intercepted.sentHeaders
+                )
+                return intercepted.response
             }
         }
 
@@ -450,7 +465,13 @@ class WebPageClient(
             if (engineResponse != null) {
                 Timber.v("$ihs : Request handled by ${engine.displayName}: ${request.url}")
                 val captured = captureResponseBody(engineResponse)
-                updatePageRequestResponse(trackedRequest, engineResponse, System.currentTimeMillis() - startTime, captured)
+                updatePageRequestResponse(
+                    trackedRequest,
+                    engineResponse,
+                    System.currentTimeMillis() - startTime,
+                    captured,
+                    sentHeadersFor(request, engine.cookiesFor(request.url.toString()))
+                )
                 return engineResponse
             }
         }
@@ -1015,9 +1036,6 @@ class WebPageClient(
         // Domain preferences are about to change, so are the custom headers derived from them
         customHeadersCache.clear()
 
-        // Domain preferences are about to change, so are the custom headers derived from them
-        customHeadersCache.clear()
-
         // Load domain preferences
         // SharedPreferences cache is cleared when files are deleted, so we can safely load
         domainPreferences = DomainPreferences(app, aHost)
@@ -1040,6 +1058,21 @@ class WebPageClient(
         if (aHost == null) return emptyMap()
         return customHeadersCache.getOrPut(aHost) { DomainPreferences(app, aHost).customHeadersMap }
     }
+
+    /**
+     * The headers an engine sends for [request], for the network panel to show.
+     *
+     * Engines take the headers WebView reported, never including cookies - interception happens
+     * before WebView's network stack attaches them - and add [aCookies] of their own. That is what
+     * we report back, since a panel that does not show the cookie header would have users think
+     * their session cookie never went out.
+     */
+    private fun sentHeadersFor(request: WebResourceRequest, aCookies: String?): Map<String, String> =
+        LinkedHashMap(request.requestHeaders).apply {
+            if (!aCookies.isNullOrBlank()) {
+                put("Cookie", aCookies)
+            }
+        }
 
     // Used to debounce app launch
     private var debounceLaunch: Runnable? = null

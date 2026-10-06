@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Tabbladen en Bladwijzerpanelen kunnen niet worden versleept</string>
     <string name="pref_title_use_bottom_sheets">Bodemplaten gebruiken</string>
     <string name="pref_summary_use_bottom_sheets">Tabbladen en bladwijzers worden weergegeven in de onderste bladen in plaats van in de zijladen</string>
-    <string name="pref_title_tab_list_item_show_close_button">Tabblad sluiten tonen</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Tabblad sluiten-knoppen op tabbladlijst-items weergeven</string>
     <string name="pref_title_crash_report">Crashrapporten</string>
     <string name="pref_title_analytics">Statistieken</string>
     <string name="pref_title_pull_to_refresh">Trekken om te verversen</string>

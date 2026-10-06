@@ -44,4 +44,17 @@
         a:icon="@drawable/ic_storage_outline"
         a:singleLineTitle="false" />
 
+    <!-- Both categories below only list what they find, tapping a row opens a dialog for it -->
+    <x.PreferenceCategory
+        a:key="@string/pref_key_cat_storage_idb"
+        a:title="@string/pref_category_title_storage_idb"
+        a:icon="@drawable/ic_storage_outline"
+        a:singleLineTitle="false" />
+
+    <x.PreferenceCategory
+        a:key="@string/pref_key_cat_storage_caches"
+        a:title="@string/pref_category_title_storage_caches"
+        a:icon="@drawable/ic_storage_outline"
+        a:singleLineTitle="false" />
+
 </androidx.preference.PreferenceScreen>

@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Картице и табле са обележивачима не могу да се превлаче</string>
     <string name="pref_title_use_bottom_sheets">Користите доње листове</string>
     <string name="pref_summary_use_bottom_sheets">Картице и обележивачи су приказани у доњим листовима уместо у бочним фиокама</string>
-    <string name="pref_title_tab_list_item_show_close_button">Прикажи дугме за затварање картице</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Прикажите дугмад за затварање картица на ставкама листе картица</string>
     <string name="pref_title_crash_report">Извештаји о падовима</string>
     <string name="pref_title_analytics">Аналитика</string>
     <string name="pref_title_pull_to_refresh">Повуците да бисте освежили</string>

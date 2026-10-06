@@ -362,8 +362,6 @@
     <string name="pref_summary_locked_drawers">Tabs and Bookmarks panels can\'t be dragged</string>
     <string name="pref_title_use_bottom_sheets">Use bottom sheets</string>
     <string name="pref_summary_use_bottom_sheets">Tabs and Bookmarks are shown in bottom sheets instead of side drawers</string>
-    <string name="pref_title_tab_list_item_show_close_button">Show close tab button</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Display close tab buttons on tab list items</string>
     <string name="pref_title_crash_report">Crash reports</string>
     <string name="pref_title_analytics">Analytics</string>
     <string name="pref_title_pull_to_refresh">Pull to refresh</string>

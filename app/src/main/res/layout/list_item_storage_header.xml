@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ The head of one column of the records table: the name of the field under it. Same room as a cell, so
+ that the two line up, and room to be read in: a field name a column is too narrow to show is a
+ column with nothing to say what it holds.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/storageHeaderCell"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:ellipsize="end"
+    android:maxLines="1"
+    android:paddingEnd="@dimen/material_grid_unit"
+    android:textColor="?android:attr/textColorSecondary"
+    android:textSize="12sp"
+    android:textStyle="bold" />

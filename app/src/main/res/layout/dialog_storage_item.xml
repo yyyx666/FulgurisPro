@@ -22,6 +22,19 @@
         android:layout_height="wrap_content"
         android:hint="@string/storage_item_value"
         android:importantForAutofill="no"
-        android:inputType="text" />
+        android:inputType="textMultiLine"
+        android:gravity="top|start"
+        android:minLines="3"
+        android:maxLines="6"
+        android:scrollHorizontally="false" />
+
+    <TextView
+        android:id="@+id/storageItemNotice"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="@dimen/material_grid_unit"
+        android:textColor="?android:attr/textColorSecondary"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
 </LinearLayout>

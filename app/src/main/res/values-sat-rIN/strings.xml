@@ -362,8 +362,6 @@
     <string name="pref_summary_locked_drawers">ᱴᱮᱵᱽ ᱟᱨ ᱪᱤᱱᱦᱟᱹ ᱯᱮᱱᱮᱞ ᱠᱚ ᱵᱟᱝ ᱫᱟᱲᱮᱭᱟᱜᱼᱟ ᱛᱟᱱᱟ</string>
     <string name="pref_title_use_bottom_sheets">ᱞᱟᱛᱟᱨ ᱥᱤᱴ ᱠᱚ ᱵᱮᱵᱷᱟᱨ</string>
     <string name="pref_summary_use_bottom_sheets">ᱴᱮᱵᱽ ᱟᱨ ᱪᱤᱱᱦᱟᱹ ᱞᱟᱛᱟᱨ ᱥᱤᱴ ᱨᱮ ᱩᱫᱩᱜᱼᱟ ᱥᱟᱭᱤᱰ ᱰᱨᱚᱣᱚᱨ ᱵᱚᱫᱚᱞ ᱛᱮ</string>
-    <string name="pref_title_tab_list_item_show_close_button">ᱴᱮᱵᱽ ᱵᱚᱸᱫᱚ ᱵᱩᱛᱟᱹᱢ ᱩᱫᱩᱜ</string>
-    <string name="pref_summary_tab_list_item_show_close_button">ᱴᱮᱵᱽ ᱞᱤᱥᱴᱤ ᱡᱤᱱᱤᱥ ᱠᱚ ᱨᱮ ᱵᱚᱸᱫᱚ ᱵᱩᱛᱟᱹᱢ ᱩᱫᱩᱜ</string>
     <string name="pref_title_crash_report">ᱠᱨᱟᱥ ᱨᱤᱯᱳᱨᱴ ᱠᱚ</string>
     <string name="pref_title_analytics">ᱮᱱᱟᱞᱤᱴᱤᱠᱥ</string>
     <string name="pref_title_pull_to_refresh">ᱫᱚᱦᱲᱟ ᱫᱚᱦᱚ ᱞᱟᱹᱜᱤᱫ ᱛᱟᱱᱟ</string>

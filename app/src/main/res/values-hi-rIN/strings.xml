@@ -338,8 +338,6 @@
     <string name="pref_summary_locked_drawers">टैब और बुकमार्क पैनल खींचे नहीं जा सकते</string>
     <string name="pref_title_use_bottom_sheets">बॉटम शीट उपयोग करें</string>
     <string name="pref_summary_use_bottom_sheets">टैब और बुकमार्क साइड ड्रॉअर के बजाय बॉटम शीट में दिखाए जाते हैं</string>
-    <string name="pref_title_tab_list_item_show_close_button">टैब बंद बटन दिखाएं</string>
-    <string name="pref_summary_tab_list_item_show_close_button">टैब सूची आइटम पर टैब बंद बटन दिखाएं</string>
     <string name="pref_title_crash_report">क्रैश रिपोर्ट</string>
     <string name="pref_title_analytics">एनालिटिक्स</string>
     <string name="pref_title_pull_to_refresh">रिफ़्रेश के लिए खींचें</string>

@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">I pannelli di schede e segnalibri non possono essere trascinati</string>
     <string name="pref_title_use_bottom_sheets">Usa schede inferiori</string>
     <string name="pref_summary_use_bottom_sheets">Le schede e i segnalibri sono mostrati nei fogli inferiori invece dei cassetti laterali</string>
-    <string name="pref_title_tab_list_item_show_close_button">Mostra pulsante chiusura tab</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Mostra pulsanti chiusura tab sugli elementi della lista dei tab</string>
     <string name="pref_title_crash_report">Rapporti di arresto anomalo</string>
     <string name="pref_title_analytics">Analitica</string>
     <string name="pref_title_pull_to_refresh">Tira per rinfrescare</string>

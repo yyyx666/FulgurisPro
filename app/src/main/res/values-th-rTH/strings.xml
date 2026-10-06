@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">ป้องกันไม่ให้ลิ้นชักปิด</string>
     <string name="pref_title_use_bottom_sheets">ใช้แผ่นงานด้านล่าง</string>
     <string name="pref_summary_use_bottom_sheets">แสดงตัวเลือกในแผ่นงานด้านล่าง</string>
-    <string name="pref_title_tab_list_item_show_close_button">แสดงปุ่มปิดในรายการแท็บ</string>
-    <string name="pref_summary_tab_list_item_show_close_button">แสดงปุ่มปิดในแต่ละรายการแท็บ</string>
     <string name="pref_title_crash_report">รายงานข้อขัดข้อง</string>
     <string name="pref_title_analytics">การวิเคราะห์</string>
     <string name="pref_title_pull_to_refresh">ดึงเพื่อรีเฟรช</string>

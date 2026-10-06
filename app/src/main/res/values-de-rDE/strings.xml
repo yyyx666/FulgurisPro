@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Tabs- und Lesezeichen-Panels können nicht verschoben werden</string>
     <string name="pref_title_use_bottom_sheets">Bottom Sheets verwenden</string>
     <string name="pref_summary_use_bottom_sheets">Tabs und Lesezeichen werden unten anstatt in den seitlichen Drawern angezeigt</string>
-    <string name="pref_title_tab_list_item_show_close_button">Tab schließen Schaltfläche anzeigen</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Schaltfläche zum Schließen von Tabs im Tab-Drawer anzeigen</string>
     <string name="pref_title_crash_report">Absturzberichte</string>
     <string name="pref_title_analytics">Analyse</string>
     <string name="pref_title_pull_to_refresh">Pull-to-Refresh</string>

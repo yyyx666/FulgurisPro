@@ -13,7 +13,7 @@
         a:allCapsTitle="true"
         tools:ignore="PrivateResource" />
 
-    <!-- Categories will be dynamically added here for each domain -->
+    <!-- Filter and request rows will be dynamically added here -->
 
 </androidx.preference.PreferenceScreen>
 

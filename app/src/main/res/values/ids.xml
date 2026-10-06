@@ -53,5 +53,9 @@
     <item name="action_translate" type="id" />
     <item name="action_toggle_cursor" type="id" />
     <item name="onConfigurationChange" type="id" />
+    <!-- One cell of the IndexedDB records table, so our device scripts can tell them apart -->
+    <item name="storageHeaderCell" type="id" />
+    <item name="storageCell" type="id" />
+    <item name="storageActionCell" type="id" />
 
 </resources>

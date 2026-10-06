@@ -75,7 +75,6 @@
     <string name="pref_key_swap_tabs_and_bookmarks">pref_key_swap_tabs_and_bookmarks</string>
     <string name="pref_key_locked_drawers">pref_key_locked_drawers</string>
     <string name="pref_key_use_bottom_sheets">pref_key_use_bottom_sheets</string>
-    <string name="pref_key_tab_list_item_show_close_button">pref_key_tab_list_item_show_close_button</string>
     <string name="pref_key_menu_show_exit">pref_key_menu_show_exit</string>
     <string name="pref_key_menu_show_new_tab">pref_key_menu_show_new_tab</string>
     <!-- Privacy -->
@@ -203,6 +202,8 @@
     <string name="pref_key_storage_refresh">pref_key_storage_refresh</string>
     <string name="pref_key_cat_storage_local">pref_key_cat_storage_local</string>
     <string name="pref_key_cat_storage_session">pref_key_cat_storage_session</string>
+    <string name="pref_key_cat_storage_idb">pref_key_cat_storage_idb</string>
+    <string name="pref_key_cat_storage_caches">pref_key_cat_storage_caches</string>
 
     <string name="pref_key_page_history">pref_key_page_history</string>
 

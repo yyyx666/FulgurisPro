@@ -14,6 +14,7 @@
  * The Original Code is Fulguris.
  *
  * The Original Developer is the Initial Developer.
+ *
  * The Initial Developer of the Original Code is Stéphane Lenclud.
  *
  * All portions of the code written by Stéphane Lenclud are Copyright © 2020 Stéphane Lenclud.
@@ -35,6 +36,7 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import dagger.hilt.android.AndroidEntryPoint
@@ -42,17 +44,53 @@ import fulguris.R
 import fulguris.activity.WebBrowserActivity
 import fulguris.extensions.onConfigurationChange
 import fulguris.network.CapturedBody
+import fulguris.network.NetworkEngineManager
+import fulguris.network.parseQueryParameters
 import fulguris.utils.BodyKind
 import fulguris.utils.Utils
 import fulguris.utils.formatBody
 import fulguris.utils.hexDump
+import fulguris.view.WebPageClient
 import java.util.Date
 
 /**
- * Fragment to display detailed information about a page request
+ * Fragment to display detailed information about a page request.
+ *
+ * One side of the request at a time, a tab bar at the top switching between what we sent and what
+ * came back. The two are long enough on their own - headers alone overflow a phone screen - and
+ * mixing them is what made the interesting part of a response hard to find.
  */
 @AndroidEntryPoint
 class RequestFragment : AbstractSettingsFragment() {
+
+    /**
+     * What we were told about one request, read from our arguments once.
+     */
+    private class Details(
+        val url: String,
+        val wasBlocked: Boolean,
+        val timestamp: Long,
+        val method: String,
+        val isMainFrame: Boolean,
+        val resourceType: String?,
+        val statusCode: Int,
+        val mimeType: String?,
+        val durationMs: Long,
+        val requestHeaders: List<String>,
+        val responseHeaders: List<String>,
+        val bodyId: Long,
+        val bodySize: Long,
+        val bodyTruncated: Boolean
+    )
+
+    private lateinit var details: Details
+
+    /**
+     * Everything below the back row and the tabs, so that switching tabs can rebuild them.
+     */
+    private val dynamicPreferences = mutableListOf<Preference>()
+
+    private var currentPane = RequestTabsPreference.Pane.REQUEST
 
     override fun titleResourceId(): Int = R.string.page_request_details_title
 
@@ -62,23 +100,353 @@ class RequestFragment : AbstractSettingsFragment() {
         super.onCreatePreferences(savedInstanceState, rootKey)
 
         // Get request details from arguments (passed from preference extras)
-        val url = arguments?.getString("url") ?: ""
-        val wasBlocked = arguments?.getBoolean("was_blocked", false) ?: false
-        val timestamp = arguments?.getLong("timestamp", 0L) ?: 0L
-        val method = arguments?.getString("method") ?: ""
-        val isMainFrame = arguments?.getBoolean("is_main_frame", false) ?: false
-        val resourceType = arguments?.getString("resource_type")
-        val statusCode = arguments?.getInt("status_code", -1) ?: -1
-        val mimeType = arguments?.getString("mime_type")
-        val durationMs = arguments?.getLong("duration_ms", -1L) ?: -1L
-        val requestHeaders = arguments?.getStringArrayList("request_headers") ?: arrayListOf()
-        val bodyId = arguments?.getLong("body_id", -1L) ?: -1L
-        val bodySize = arguments?.getLong("body_size", -1L) ?: -1L
-        val bodyTruncated = arguments?.getBoolean("body_truncated", false) ?: false
+        details = Details(
+            url = arguments?.getString("url") ?: "",
+            wasBlocked = arguments?.getBoolean("was_blocked", false) ?: false,
+            timestamp = arguments?.getLong("timestamp", 0L) ?: 0L,
+            method = arguments?.getString("method") ?: "",
+            isMainFrame = arguments?.getBoolean("is_main_frame", false) ?: false,
+            resourceType = arguments?.getString("resource_type"),
+            statusCode = arguments?.getInt("status_code", -1) ?: -1,
+            mimeType = arguments?.getString("mime_type"),
+            durationMs = arguments?.getLong("duration_ms", -1L) ?: -1L,
+            requestHeaders = arguments?.getStringArrayList("request_headers") ?: arrayListOf(),
+            responseHeaders = arguments?.getStringArrayList("response_headers") ?: arrayListOf(),
+            bodyId = arguments?.getLong("body_id", -1L) ?: -1L,
+            bodySize = arguments?.getLong("body_size", -1L) ?: -1L,
+            bodyTruncated = arguments?.getBoolean("body_truncated", false) ?: false
+        )
 
-        populateRequestDetails(url, wasBlocked, timestamp)
-        populateNetworkDetails(method, isMainFrame, resourceType, statusCode, mimeType, durationMs, requestHeaders)
-        populateResponseBody(bodyId, bodySize, bodyTruncated, method, statusCode, mimeType)
+        setBackSummary(details.url)
+
+        currentPane = restoredPane(savedInstanceState)
+
+        // Built here and not declared in the XML: the switch only works once its callback is ours,
+        // and handing it over at construction is the one wiring that cannot miss. It is not added
+        // through `addDynamic`: that list is what `renderPane` empties, and the tabs outlive it.
+        val tabs = RequestTabsPreference(requireContext()).apply {
+            select(currentPane)
+            onPaneSelected = { pane ->
+                currentPane = pane
+                renderPane()
+            }
+        }
+        preferenceScreen.addPreference(tabs)
+
+        renderPane()
+    }
+
+    /**
+     * The half we were showing, Request when we cannot tell.
+     */
+    private fun restoredPane(savedInstanceState: Bundle?): RequestTabsPreference.Pane {
+        val name = savedInstanceState?.getString(STATE_PANE)
+        return RequestTabsPreference.Pane.entries.firstOrNull { it.name == name }
+            ?: RequestTabsPreference.Pane.REQUEST
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        // A rotation recreates us, and landing back on the request side after reading a response
+        // is the kind of small betrayal that makes a panel tiring to use
+        outState.putString(STATE_PANE, currentPane.name)
+    }
+
+    /**
+     * Show the half of the request we are on, and only that one.
+     */
+    private fun renderPane() {
+        dynamicPreferences.forEach { preferenceScreen.removePreference(it) }
+        dynamicPreferences.clear()
+
+        when (currentPane) {
+            RequestTabsPreference.Pane.REQUEST -> populateRequestPane()
+            RequestTabsPreference.Pane.RESPONSE -> populateResponsePane()
+        }
+    }
+
+    /**
+     * Register a preference we own, so that our next tab switch takes it away again.
+     */
+    private fun addDynamic(preference: Preference) {
+        preferenceScreen.addPreference(preference)
+        dynamicPreferences.add(preference)
+    }
+
+    /**
+     * Our back row shows the URL scheme, the shortest thing that still says where we came from.
+     */
+    private fun setBackSummary(url: String) {
+        findPreference<Preference>(getString(R.string.pref_key_back))?.apply {
+            isVisible = true
+            summary = try {
+                Uri.parse(url).scheme ?: url
+            } catch (e: Exception) {
+                ""
+            }
+        }
+    }
+
+    /**
+     * The network client of the tab we are showing a request of.
+     */
+    private fun webPageClient(): WebPageClient? =
+        (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.webPageClient
+
+    /**
+     * What we sent: where it went, how, and with which headers.
+     */
+    private fun populateRequestPane() {
+        val url = details.url
+
+        // Open URL preference
+        addDynamic(x.Preference(requireContext()).apply {
+            title = getString(R.string.action_open)
+            summary = url
+            isSingleLineSummary = true
+            isIconSpaceReserved = true
+            setIcon(R.drawable.ic_link)
+            intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply {
+                setPackage(requireContext().packageName)
+                // Make sure we tell ourselves where this is coming from
+                // Avoid sending ourselves to the background when closing this tab
+                putExtra("PACKAGE", requireContext().packageName)
+            }
+        })
+
+        // Status category
+        val statusCategory = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_status)
+            isIconSpaceReserved = false
+        }
+        addDynamic(statusCategory)
+
+        statusCategory.addPreference(x.Preference(requireContext()).apply {
+            title = if (details.wasBlocked) {
+                getString(R.string.page_requests_blocked)
+            } else {
+                getString(R.string.page_requests_allowed)
+            }
+            isIconSpaceReserved = true
+            setIcon(if (details.wasBlocked) R.drawable.ic_block else R.drawable.ic_check)
+            isSelectable = false
+        })
+
+        populateUrlDetails(url)
+        populateNetworkDetails()
+
+        addHeaderCategory(R.string.request_headers, R.string.request_headers_none, details.requestHeaders)
+
+        // Timestamp category
+        val timestampCategory = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_timestamp)
+            isIconSpaceReserved = false
+        }
+        addDynamic(timestampCategory)
+
+        timestampCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_timestamp)
+            summary = if (details.timestamp > 0) {
+                DateFormat.format("yyyy-MM-dd HH:mm:ss", Date(details.timestamp)).toString()
+            } else {
+                getString(R.string.unknown)
+            }
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+    }
+
+    /**
+     * Whatever we can pull out of the URL ourselves: the parts of it a user copies out.
+     */
+    private fun populateUrlDetails(url: String) {
+        try {
+            val uri = Uri.parse(url)
+
+            // URL Details category
+            val detailsCategory = PreferenceCategory(requireContext()).apply {
+                title = getString(R.string.request_url)
+                isIconSpaceReserved = false
+            }
+            addDynamic(detailsCategory)
+
+            // Copy URL preference (first in category)
+            detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                title = getString(R.string.action_copy)
+                summary = getString(R.string.request_url_length, url.length)
+                isIconSpaceReserved = true
+                setIcon(R.drawable.ic_content_copy)
+                setOnPreferenceClickListener {
+                    val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    val clip = android.content.ClipData.newPlainText("URL", url)
+                    clipboard.setPrimaryClip(clip)
+                    // Show a toast to confirm
+                    android.widget.Toast.makeText(requireContext(), R.string.message_text_copied, android.widget.Toast.LENGTH_SHORT).show()
+                    true
+                }
+            })
+
+            // Full URL preference
+            detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                title = getString(R.string.request_url)
+                summary = url
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+
+            // Domain preference
+            uri.host?.let { host ->
+                detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                    title = getString(R.string.request_domain)
+                    summary = host
+                    isIconSpaceReserved = false
+                    isSelectable = false
+                })
+            }
+
+            // Path preference
+            uri.path?.let { path ->
+                detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                    title = getString(R.string.request_path)
+                    summary = path
+                    isIconSpaceReserved = false
+                    isSelectable = false
+                })
+            }
+
+            // Every parameter, repeated names included: that is the request, and a plain lookup
+            // would only ever show the first value of each name
+            uri.encodedQuery?.let { query ->
+                val parameters = parseQueryParameters(query)
+                if (parameters.isNotEmpty()) {
+                    detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                        title = getString(R.string.request_parameters)
+                        isIconSpaceReserved = false
+                        isSelectable = false
+                    })
+                }
+                parameters.forEach { (name, value) ->
+                    detailsCategory.addPreference(x.Preference(requireContext()).apply {
+                        title = name
+                        summary = value
+                        isSingleLineSummary = true
+                        isIconSpaceReserved = false
+                        isCopyingEnabled = true
+                        isSelectable = false
+                    })
+                }
+            }
+        } catch (e: Exception) {
+            // If URL parsing fails, just show the raw URL
+            addDynamic(x.Preference(requireContext()).apply {
+                title = getString(R.string.request_url)
+                summary = url
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+        }
+    }
+
+    /**
+     * Populate our network section with whatever the network layer was able to report.
+     * Response side information is only available when an engine handled the request.
+     */
+    private fun populateNetworkDetails() {
+        val unknown = getString(R.string.request_unknown_value)
+
+        val networkCategory = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_network)
+            isIconSpaceReserved = false
+        }
+        addDynamic(networkCategory)
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_method)
+            summary = if (details.method.isEmpty()) unknown else details.method
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_type)
+            summary = when {
+                details.isMainFrame -> getString(R.string.request_main_frame)
+                details.resourceType != null -> details.resourceType
+                else -> unknown
+            }
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_status)
+            summary = if (details.statusCode >= 0) details.statusCode.toString() else unknown
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_mime)
+            summary = details.mimeType ?: unknown
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+
+        networkCategory.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_duration)
+            summary = if (details.durationMs >= 0) {
+                getString(R.string.request_duration_value, details.durationMs)
+            } else {
+                unknown
+            }
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+    }
+
+    /**
+     * What came back: the headers it answered with and the body we captured.
+     */
+    private fun populateResponsePane() {
+        addHeaderCategory(
+            R.string.request_response_headers,
+            R.string.request_headers_none,
+            details.responseHeaders
+        )
+        populateResponseBody()
+    }
+
+    /**
+     * Add one category listing [headers], one preference each, or the [aEmptySummary] line when we
+     * were reported none.
+     */
+    private fun addHeaderCategory(aTitle: Int, aEmptySummary: Int, headers: List<String>) {
+        val category = PreferenceCategory(requireContext()).apply {
+            title = getString(aTitle)
+            isIconSpaceReserved = false
+        }
+        addDynamic(category)
+
+        if (headers.isEmpty()) {
+            category.addPreference(x.Preference(requireContext()).apply {
+                summary = getString(aEmptySummary)
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+            return
+        }
+
+        headers.forEach { header ->
+            category.addPreference(x.Preference(requireContext()).apply {
+                title = header.substringBefore(':')
+                summary = header.substringAfter(':').trim()
+                isSingleLineSummary = true
+                summaryEllipsize = TextUtils.TruncateAt.MIDDLE
+                isIconSpaceReserved = false
+                isCopyingEnabled = true
+                isSelectable = false
+            })
+        }
     }
 
     /**
@@ -88,30 +456,24 @@ class RequestFragment : AbstractSettingsFragment() {
      * `WebPageClient.captureResponseBody`. So when we have none we tell the user why instead of
      * pretending there is nothing to see.
      */
-    private fun populateResponseBody(
-        bodyId: Long,
-        bodySize: Long,
-        bodyTruncated: Boolean,
-        method: String,
-        statusCode: Int,
-        mimeType: String?
-    ) {
+    private fun populateResponseBody() {
         val category = PreferenceCategory(requireContext()).apply {
             title = getString(R.string.request_body)
             isIconSpaceReserved = false
         }
-        preferenceScreen.addPreference(category)
+        addDynamic(category)
 
-        val body = (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.webPageClient?.getResponseBody(bodyId)
+        val body = details.bodyId.takeIf { it >= 0 }?.let { webPageClient()?.getResponseBody(it) }
 
         if (body == null) {
             category.addPreference(x.Preference(requireContext()).apply {
                 summary = getString(
-                    if (isBodylessRequestMethod(method) && statusCode < 0) {
-                        R.string.request_body_unavailable_method
-                    } else {
-                        R.string.request_body_unavailable_webview
-                    }
+                    bodyUnavailableReason(
+                        details.wasBlocked,
+                        details.bodySize,
+                        details.method,
+                        details.statusCode
+                    )
                 )
                 isIconSpaceReserved = false
                 isSelectable = false
@@ -119,11 +481,13 @@ class RequestFragment : AbstractSettingsFragment() {
             return
         }
 
-        val formatted = formatBody(body.bytes, mimeType)
+        val formatted = formatBody(body.bytes, details.mimeType)
+        // A truncated image is not decodable, showing its bytes is all we can do
+        val kind = if (body.truncated && formatted.kind == BodyKind.IMAGE) BodyKind.BINARY else formatted.kind
 
         category.addPreference(x.Preference(requireContext()).apply {
             title = getString(
-                when (formatted.kind) {
+                when (kind) {
                     BodyKind.IMAGE -> R.string.request_body_preview_image
                     BodyKind.BINARY -> R.string.request_body_raw
                     else -> R.string.request_body_view
@@ -134,24 +498,52 @@ class RequestFragment : AbstractSettingsFragment() {
             }
             isIconSpaceReserved = true
             setIcon(
-                when (formatted.kind) {
+                when (kind) {
                     BodyKind.IMAGE -> R.drawable.ic_image
                     BodyKind.BINARY -> R.drawable.ic_unknown_document_outline
                     else -> R.drawable.ic_code
                 }
             )
             setOnPreferenceClickListener {
-                showResponseBody(body, formatted.kind, formatted.text)
+                showResponseBody(body, kind, formatted.text)
                 true
             }
         })
 
         category.addPreference(x.Preference(requireContext()).apply {
             title = getString(R.string.request_body_size)
-            summary = buildSizeSummary(bodySize, bodyTruncated)
+            summary = buildSizeSummary(details.bodySize, details.bodyTruncated)
             isIconSpaceReserved = false
             isSelectable = false
         })
+    }
+
+    /**
+     * Why we have no body for a request, as a string resource.
+     *
+     * Four different things keep a body from us and conflating them sends the user chasing the
+     * wrong one: the request never carried one, no engine was in charge, the engine declined it, or
+     * we captured it and dropped it under memory pressure.
+     */
+    private fun bodyUnavailableReason(
+        wasBlocked: Boolean,
+        bodySize: Long,
+        method: String,
+        statusCode: Int
+    ): Int {
+        val engine = webPageClient()?.networkEngineManager?.getCurrentEngine()
+        val engineProvidesBodies = engine != null && engine.id != NetworkEngineManager.DEFAULT_ENGINE_ID
+
+        return when {
+            wasBlocked -> R.string.request_body_unavailable_blocked
+            // A body size means we did capture one, so it is the eviction that took it from us
+            bodySize >= 0 -> R.string.request_body_unavailable_evicted
+            isBodylessRequestMethod(method) -> R.string.request_body_unavailable_method
+            !engineProvidesBodies -> R.string.request_body_unavailable_webview
+            // The engine had the request and still gave us no body, typically a response it could
+            // not use, like a 304 or an error
+            else -> R.string.request_body_unavailable_engine
+        }
     }
 
     /**
@@ -200,6 +592,9 @@ class RequestFragment : AbstractSettingsFragment() {
 
     /**
      * A scrollable, selectable, monospace view of a body.
+     *
+     * Wrapped in a plain container: [onConfigurationChange] adds a child of its own to what we hand
+     * it and a [ScrollView] only ever accepts one.
      */
     private fun buildTextView(content: String): View {
         val padding = resources.getDimensionPixelSize(R.dimen.dialog_padding)
@@ -210,8 +605,11 @@ class RequestFragment : AbstractSettingsFragment() {
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
             setPadding(padding, padding, padding, padding)
         }
-        return ScrollView(requireContext()).apply {
+        val scroll = ScrollView(requireContext()).apply {
             addView(view)
+        }
+        return LinearLayout(requireContext()).apply {
+            addView(scroll)
         }
     }
 
@@ -226,19 +624,24 @@ class RequestFragment : AbstractSettingsFragment() {
         options.inJustDecodeBounds = false
         options.inSampleSize = Utils.calculateInSampleSize(options, metrics.widthPixels, metrics.heightPixels)
 
+        // Null when what we hold is not an image after all, the MIME type being all we have to go on
         val bitmap = BitmapFactory.decodeByteArray(body.bytes, 0, body.bytes.size, options)
 
-        val imageView = ImageView(requireContext()).apply {
-            setImageBitmap(bitmap)
-            adjustViewBounds = true
-            scaleType = ImageView.ScaleType.FIT_CENTER
-            contentDescription = getString(R.string.request_body_preview_image)
+        val content: View = if (bitmap == null) {
+            buildTextView(getString(R.string.request_body_not_an_image))
+        } else {
+            ImageView(requireContext()).apply {
+                setImageBitmap(bitmap)
+                adjustViewBounds = true
+                scaleType = ImageView.ScaleType.FIT_CENTER
+                contentDescription = getString(R.string.request_body_preview_image)
+            }
         }
 
         val padding = resources.getDimensionPixelSize(R.dimen.dialog_padding)
         return LinearLayout(requireContext()).apply {
             setPadding(padding, padding, padding, padding)
-            addView(imageView)
+            addView(content)
         }
     }
 
@@ -251,262 +654,7 @@ class RequestFragment : AbstractSettingsFragment() {
                 method.equals("PUT", ignoreCase = true) ||
                 method.equals("PATCH", ignoreCase = true)
 
-    /**
-     * Populate our network section with whatever the network layer was able to report.
-     * Response side information is only available when an engine handled the request.
-     */
-    private fun populateNetworkDetails(
-        method: String,
-        isMainFrame: Boolean,
-        resourceType: String?,
-        statusCode: Int,
-        mimeType: String?,
-        durationMs: Long,
-        requestHeaders: List<String>
-    ) {
-        val unknown = getString(R.string.request_unknown_value)
-
-        val networkCategory = PreferenceCategory(requireContext()).apply {
-            title = getString(R.string.request_network)
-            isIconSpaceReserved = false
-        }
-        preferenceScreen.addPreference(networkCategory)
-
-        networkCategory.addPreference(x.Preference(requireContext()).apply {
-            title = getString(R.string.request_method)
-            summary = if (method.isEmpty()) unknown else method
-            isIconSpaceReserved = false
-            isSelectable = false
-        })
-
-        networkCategory.addPreference(x.Preference(requireContext()).apply {
-            title = getString(R.string.request_type)
-            summary = when {
-                isMainFrame -> getString(R.string.request_main_frame)
-                resourceType != null -> resourceType
-                else -> unknown
-            }
-            isIconSpaceReserved = false
-            isSelectable = false
-        })
-
-        networkCategory.addPreference(x.Preference(requireContext()).apply {
-            title = getString(R.string.request_status)
-            summary = if (statusCode >= 0) statusCode.toString() else unknown
-            isIconSpaceReserved = false
-            isSelectable = false
-        })
-
-        networkCategory.addPreference(x.Preference(requireContext()).apply {
-            title = getString(R.string.request_mime)
-            summary = mimeType ?: unknown
-            isIconSpaceReserved = false
-            isSelectable = false
-        })
-
-        networkCategory.addPreference(x.Preference(requireContext()).apply {
-            title = getString(R.string.request_duration)
-            summary = if (durationMs >= 0) {
-                getString(R.string.request_duration_value, durationMs)
-            } else {
-                unknown
-            }
-            isIconSpaceReserved = false
-            isSelectable = false
-        })
-
-        val headersCategory = PreferenceCategory(requireContext()).apply {
-            title = getString(R.string.request_headers)
-            isIconSpaceReserved = false
-        }
-        preferenceScreen.addPreference(headersCategory)
-
-        if (requestHeaders.isEmpty()) {
-            headersCategory.addPreference(x.Preference(requireContext()).apply {
-                summary = getString(R.string.request_headers_none)
-                isIconSpaceReserved = false
-                isSelectable = false
-            })
-            return
-        }
-
-        requestHeaders.forEach { header ->
-            headersCategory.addPreference(x.Preference(requireContext()).apply {
-                title = header.substringBefore(':')
-                summary = header.substringAfter(':').trim()
-                isSingleLineSummary = true
-                summaryEllipsize = android.text.TextUtils.TruncateAt.MIDDLE
-                isIconSpaceReserved = false
-                isCopyingEnabled = true
-                isSelectable = false
-            })
-        }
-    }
-
-    /**
-     * Populate the preference screen with request details
-     */
-    private fun populateRequestDetails(url: String, wasBlocked: Boolean, timestamp: Long) {
-        val preferenceScreen = preferenceScreen
-
-        // Update the back preference with scheme as summary and make it visible
-        findPreference<androidx.preference.Preference>(getString(R.string.pref_key_back))?.apply {
-            isVisible = true
-            summary = try {
-                Uri.parse(url).scheme ?: url
-            } catch (e: Exception) {
-                ""
-            }
-        }
-
-        // Open URL preference
-        val openPref = x.Preference(requireContext()).apply {
-            title = getString(R.string.action_open)
-            summary = url
-            isSingleLineSummary = true
-            isIconSpaceReserved = true
-            setIcon(R.drawable.ic_link)
-            intent = android.content.Intent(android.content.Intent.ACTION_VIEW, Uri.parse(url)).apply {
-                setPackage(requireContext().packageName)
-                // Make sure we tell ourselves where this is coming from
-                // Avoid sending ourselves to the background when closing this tab
-                putExtra("PACKAGE", requireContext().packageName)
-            }
-        }
-        preferenceScreen.addPreference(openPref)
-
-
-        // Status category
-        val statusCategory = PreferenceCategory(requireContext()).apply {
-            title = getString(R.string.request_status)
-            isIconSpaceReserved = false
-        }
-        preferenceScreen.addPreference(statusCategory)
-
-        // Status preference
-        val statusPref = x.Preference(requireContext()).apply {
-            title = if (wasBlocked) {
-                getString(R.string.page_requests_blocked)
-            } else {
-                getString(R.string.page_requests_allowed)
-            }
-            isIconSpaceReserved = true
-            setIcon(if (wasBlocked) R.drawable.ic_block else R.drawable.ic_check)
-            isSelectable = false
-        }
-        statusCategory.addPreference(statusPref)
-
-        // Parse URL for details
-        try {
-            val uri = Uri.parse(url)
-
-            // URL Details category
-            val detailsCategory = PreferenceCategory(requireContext()).apply {
-                title = getString(R.string.request_url)
-                isIconSpaceReserved = false
-            }
-            preferenceScreen.addPreference(detailsCategory)
-
-            // Copy URL preference (first in category)
-            val copyPref = x.Preference(requireContext()).apply {
-                title = getString(R.string.action_copy)
-                summary = getString(R.string.request_url_length, url.length)
-                isIconSpaceReserved = true
-                setIcon(R.drawable.ic_content_copy)
-                setOnPreferenceClickListener {
-                    val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
-                    val clip = android.content.ClipData.newPlainText("URL", url)
-                    clipboard.setPrimaryClip(clip)
-                    // Show a toast to confirm
-                    android.widget.Toast.makeText(requireContext(), R.string.message_text_copied, android.widget.Toast.LENGTH_SHORT).show()
-                    true
-                }
-            }
-            detailsCategory.addPreference(copyPref)
-
-            // Full URL preference
-            val urlPref = x.Preference(requireContext()).apply {
-                title = getString(R.string.request_url)
-                summary = url
-                isIconSpaceReserved = false
-                isSelectable = false
-            }
-            detailsCategory.addPreference(urlPref)
-
-            // Domain preference
-            uri.host?.let { host ->
-                val domainPref = x.Preference(requireContext()).apply {
-                    title = getString(R.string.request_domain)
-                    summary = host
-                    isIconSpaceReserved = false
-                    isSelectable = false
-                }
-                detailsCategory.addPreference(domainPref)
-            }
-
-            // Path preference
-            uri.path?.let { path ->
-                val pathPref = x.Preference(requireContext()).apply {
-                    title = getString(R.string.request_path)
-                    summary = path
-                    isIconSpaceReserved = false
-                    isSelectable = false
-                }
-                detailsCategory.addPreference(pathPref)
-            }
-
-            // Parameters category (if URL has query parameters)
-            val queryParams = uri.queryParameterNames
-            if (queryParams != null && queryParams.isNotEmpty()) {
-                val paramsCategory = PreferenceCategory(requireContext()).apply {
-                    title = getString(R.string.request_parameters)
-                    isIconSpaceReserved = false
-                }
-                preferenceScreen.addPreference(paramsCategory)
-
-                // Add each parameter as a preference
-                queryParams.forEach { paramName ->
-                    val paramValue = uri.getQueryParameter(paramName) ?: ""
-                    val paramPref = x.Preference(requireContext()).apply {
-                        title = paramName
-                        summary = paramValue
-                        isSingleLineSummary = true
-                        isIconSpaceReserved = false
-                        isSelectable = true
-                    }
-                    paramsCategory.addPreference(paramPref)
-                }
-            }
-        } catch (e: Exception) {
-            // If URL parsing fails, just show the raw URL
-            val urlPref = x.Preference(requireContext()).apply {
-                title = getString(R.string.request_url)
-                summary = url
-                isIconSpaceReserved = false
-                isSelectable = false
-            }
-            preferenceScreen.addPreference(urlPref)
-        }
-
-        // Timestamp category
-        val timestampCategory = PreferenceCategory(requireContext()).apply {
-            title = getString(R.string.request_timestamp)
-            isIconSpaceReserved = false
-        }
-        preferenceScreen.addPreference(timestampCategory)
-
-        // Timestamp preference
-        val timestampPref = x.Preference(requireContext()).apply {
-            title = getString(R.string.request_timestamp)
-            summary = if (timestamp > 0) {
-                DateFormat.format("yyyy-MM-dd HH:mm:ss", Date(timestamp)).toString()
-            } else {
-                getString(R.string.unknown)
-            }
-            isIconSpaceReserved = false
-            isSelectable = false
-        }
-        timestampCategory.addPreference(timestampPref)
+    companion object {
+        private const val STATE_PANE = "request_pane"
     }
 }
-

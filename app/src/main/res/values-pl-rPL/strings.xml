@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Panele kart i zakładek nie mogą być przeciągane</string>
     <string name="pref_title_use_bottom_sheets">Użyj wysuwanych paneli</string>
     <string name="pref_summary_use_bottom_sheets">Karty i zakładki będą wyświetlane w dolnym panelu zamiast w bocznym</string>
-    <string name="pref_title_tab_list_item_show_close_button">Wyświetlaj przycisk do zamknięcia kart</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Wyświetlaj przycisk do zamknięcia karty na liście kart</string>
     <string name="pref_title_crash_report">Raporty awarii</string>
     <string name="pref_title_analytics">Analityka</string>
     <string name="pref_title_pull_to_refresh">Pociągnij, aby odświeżyć</string>

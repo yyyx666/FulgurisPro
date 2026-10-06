@@ -29,10 +29,12 @@ import fulguris.extensions.launch
 import android.annotation.SuppressLint
 import android.content.SharedPreferences
 import android.os.Bundle
+import android.text.TextUtils
 import android.view.LayoutInflater
 import android.view.View
 import android.webkit.CookieManager
 import android.widget.EditText
+import android.widget.TextView
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -218,17 +220,31 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
      * `WebViewFeature.GET_COOKIE_INFO` is supported: without it we can still edit the name and the
      * value, and WebView files the cookie under the current page.
      */
-    private fun showCookieDialog(url: String, existing: CookieFields?) {
+    private fun showCookieDialog(url: String, existing: CookieFields?, attributes: List<String> = emptyList()) {
         val layout = LayoutInflater.from(requireContext()).inflate(R.layout.dialog_cookie_item, null)
         val nameField = layout.findViewById<EditText>(R.id.cookieName)
         val valueField = layout.findViewById<EditText>(R.id.cookieValue)
         val domainField = layout.findViewById<EditText>(R.id.cookieDomain)
         val pathField = layout.findViewById<EditText>(R.id.cookiePath)
+        val attributesLabel = layout.findViewById<TextView>(R.id.cookieAttributesLabel)
+        val attributesView = layout.findViewById<TextView>(R.id.cookieAttributes)
 
         nameField.setText(existing?.name.orEmpty())
         valueField.setText(existing?.value.orEmpty())
         domainField.setText(existing?.domain.orEmpty())
         pathField.setText(existing?.path.orEmpty())
+
+        // What the cookie carries beyond its name and value: read here, written by the browser from
+        // what the page set. Both views are in the layout as gone, so an empty list leaves nothing
+        // of them on screen.
+        if (attributes.isEmpty()) {
+            attributesLabel.visibility = View.GONE
+            attributesView.visibility = View.GONE
+        } else {
+            attributesLabel.visibility = View.VISIBLE
+            attributesView.visibility = View.VISIBLE
+            attributesView.text = attributes.joinToString("\n")
+        }
 
         val builder = MaterialAlertDialogBuilder(requireContext())
             .setTitle(if (existing == null) R.string.cookie_item_new_title else R.string.cookie_item_edit_title)
@@ -299,13 +315,19 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
                 // Create cookie preference
                 val pref = x.Preference(requireContext()).apply {
                     // Make sure domains and not reversed domains are shown as titles
-                    isSingleLineTitle = false
+                    isSingleLineTitle = true
+                    titleEllipsize = TextUtils.TruncateAt.MIDDLE
                     title = fields.name
-                    summary = cookieSummary(fields, cookie)
+                    // One line, and what is cut off is its end: the value is what we are listing,
+                    // the attributes it carries are read in the dialog instead. What the storage
+                    // panel does with its items.
+                    isSingleLineSummary = true
+                    summaryEllipsize = TextUtils.TruncateAt.END
+                    summary = fields.value
                     // Long pressing copies the raw cookie, tapping edits it
                     isCopyingEnabled = true
                     onPreferenceClickListener = Preference.OnPreferenceClickListener {
-                        showCookieDialog(url, fields)
+                        showCookieDialog(url, fields, cookieAttributes(cookie))
                         true
                     }
                 }
@@ -324,13 +346,12 @@ class CookiesSettingsFragment : AbstractSettingsFragment() {
     }
 
     /**
-     * Show the cookie value followed by its attributes, one per line.
+     * The parts of [cookie] past its name and value, one entry per attribute, as the browser wrote
+     * them. Empty for a cookie carrying none.
      */
-    private fun cookieSummary(fields: CookieFields, cookie: String): String {
-        val attributes = cookie.split(';')
+    private fun cookieAttributes(cookie: String): List<String> =
+        cookie.split(';')
             .drop(1)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
-        return (listOf(fields.value) + attributes).joinToString("\n")
-    }
 }

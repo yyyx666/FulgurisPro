@@ -126,6 +126,10 @@ def _adb(serial: str | None, args: list[str], timeout: int = 30) -> str:
                 # Connection dropped; retry so the device has a moment to come back.
                 time.sleep(1.0)
                 continue
+            if result.returncode != 0 and not out:
+                # A device-side shell error, which we would otherwise swallow: `input text` with an
+                # unquoted parenthesis, say, looks exactly like our text never having arrived.
+                sys.stderr.write((result.stderr or "").strip() + "\n")
             return out
         except subprocess.TimeoutExpired as e:
             last_error = e
@@ -655,7 +659,16 @@ def tab_entries(serial: str) -> list[tuple[str, tuple[int, int]]]:
 
 
 def type_text(serial: str, text: str, wait: float = 0.5) -> None:
-    _adb(serial, ["shell", "input", "text", text.replace(" ", "%s")])
+    """Type [text] into whatever holds focus.
+
+    Two shells read this text before `input` does. Ours, which we keep out of it by passing the
+    words as a list, and the device's - `adb shell` makes one command line of them, so a
+    parenthesis, a `&` or a `;` is syntax there and our text reaches `input` cut short. Hence the
+    quoting, single quotes being the shell's own way of saying "all of this, as it is". Then
+    `input` wants a space written `%s`; a space of its own it reads as separating arguments.
+    """
+    escaped = text.replace(" ", "%s").replace("'", "'\\''")
+    _adb(serial, ["shell", "input", "text", f"'{escaped}'"])
     time.sleep(wait)
 
 
@@ -671,6 +684,7 @@ class Node:
     text: str
     focused: bool
     bounds: tuple[int, int, int, int] | None
+    enabled: bool = True
 
 
 def _parse_bounds(value: str) -> tuple[int, int, int, int] | None:
@@ -695,6 +709,7 @@ def nodes(serial: str) -> list[Node]:
                 text=el.get("text", ""),
                 focused=el.get("focused", "false") == "true",
                 bounds=_parse_bounds(el.get("bounds", "")),
+                enabled=el.get("enabled", "true") == "true",
             )
         )
     return result

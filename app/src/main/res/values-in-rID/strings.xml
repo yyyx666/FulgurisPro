@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Panel Tab dan Penanda tidak bisa diseret</string>
     <string name="pref_title_use_bottom_sheets">Gunakan bottom sheets</string>
     <string name="pref_summary_use_bottom_sheets">Tab dan Penanda ditampilkan dalam bentuk <i>bottom sheets</i> daripada <i>side drawers</i></string>
-    <string name="pref_title_tab_list_item_show_close_button">Tampilkan tombol penutup tab</string>
-    <string name="pref_summary_tab_list_item_show_close_button">pada setiap tab pada daftar tab</string>
     <string name="pref_title_crash_report">Laporan crash</string>
     <string name="pref_title_analytics">Analitik</string>
     <string name="pref_title_pull_to_refresh">Tarik untuk memperbarui</string>

@@ -410,11 +410,6 @@ class UserPreferences @Inject constructor(
     fun isLog(aLevel: LogLevel) = logs && aLevel >= logLevel
 
     /**
-     * Toggle visibility of close tab button on drawer tab list items.
-     */
-    var showCloseTabButton by preferences.booleanPreference(R.string.pref_key_tab_list_item_show_close_button, if (screenSize.isTablet())  R.bool.const_true else R.bool.pref_default_tab_list_item_show_close_button)
-
-    /**
      * Save sponsorship level.
      * Default level is defined by our build configuration.
      */

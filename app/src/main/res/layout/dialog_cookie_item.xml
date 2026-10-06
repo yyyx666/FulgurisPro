@@ -22,7 +22,28 @@
         android:layout_height="wrap_content"
         android:hint="@string/cookie_item_value"
         android:importantForAutofill="no"
-        android:inputType="text" />
+        android:inputType="textMultiLine"
+        android:gravity="top|start"
+        android:minLines="3"
+        android:maxLines="6"
+        android:scrollHorizontally="false" />
+
+    <TextView
+        android:id="@+id/cookieAttributesLabel"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="8dp"
+        android:text="@string/cookie_item_attributes"
+        android:textSize="12sp"
+        android:visibility="gone" />
+
+    <TextView
+        android:id="@+id/cookieAttributes"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textIsSelectable="true"
+        android:textSize="12sp"
+        android:visibility="gone" />
 
     <EditText
         android:id="@+id/cookieDomain"

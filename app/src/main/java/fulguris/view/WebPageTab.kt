@@ -154,6 +154,28 @@ class WebPageTab(
         synchronized(consoleMessages) {
             consoleMessages.add(ConsoleMessage(consoleMessage))
         }
+
+        consoleMessageListeners.toList().forEach { it() }
+    }
+
+    /// Told when a console message lands, so that a console panel on screen can show it as it
+    /// happens rather than on its next look at the collection
+    private val consoleMessageListeners = mutableListOf<() -> Unit>()
+
+    /**
+     * Ask to be told about every console message from now on.
+     *
+     * Called on the UI thread, which is where the messages themselves arrive.
+     */
+    fun addConsoleMessageListener(listener: () -> Unit) {
+        consoleMessageListeners.add(listener)
+    }
+
+    /**
+     * Undo an [addConsoleMessageListener], with the very listener that was handed over.
+     */
+    fun removeConsoleMessageListener(listener: () -> Unit) {
+        consoleMessageListeners.remove(listener)
     }
 
     /**

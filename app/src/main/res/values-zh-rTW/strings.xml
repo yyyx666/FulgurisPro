@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">無法拖曳分頁和書籤面板</string>
     <string name="pref_title_use_bottom_sheets">使用底部面板</string>
     <string name="pref_summary_use_bottom_sheets">分頁和書籤顯示在底部面板而非側邊抽屜中</string>
-    <string name="pref_title_tab_list_item_show_close_button">顯示關閉分頁按鈕</string>
-    <string name="pref_summary_tab_list_item_show_close_button">在分頁清單項目上顯示關閉分頁按鈕</string>
     <string name="pref_title_crash_report">當機報告</string>
     <string name="pref_title_analytics">分析</string>
     <string name="pref_title_pull_to_refresh">下拉重新整理</string>

@@ -24,18 +24,12 @@
 package fulguris.network
 
 /**
- * Group [items] by [key], newest first at both levels.
+ * [items] ordered by [timestamp], most recent first.
  *
- * Both the groups and the items within each group are ordered by [timestamp] descending: a group
- * comes before another when its most recent item is more recent, and items inside a group are
- * themselves newest first.
+ * A plain list, not a map: the requests panel is a timeline, and splitting it by domain would hide
+ * what a page actually did in the order it did it. Domains still show up, on each row.
  *
- * Sorting before grouping is what gives us that group order, `groupBy` preserving the iteration
- * order of the list it is given. The sort is stable, so items sharing a timestamp keep their
- * original order.
+ * The sort is stable, so requests sharing a timestamp keep the order they were recorded in.
  */
-fun <T> groupNewestFirstBy(
-    items: List<T>,
-    timestamp: (T) -> Long,
-    key: (T) -> String
-): Map<String, List<T>> = items.sortedByDescending(timestamp).groupBy(key)
+fun <T> newestFirst(items: List<T>, timestamp: (T) -> Long): List<T> =
+    items.sortedByDescending(timestamp)

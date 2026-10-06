@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Les panneaux Onglets et Favoris ne peuvent être déplacés</string>
     <string name="pref_title_use_bottom_sheets">Utiliser le panneau inférieur</string>
     <string name="pref_summary_use_bottom_sheets">Onglets et Favoris utiliseront le panneau inférieur à la place des panneaux latéraux</string>
-    <string name="pref_title_tab_list_item_show_close_button">Afficher le bouton de fermeture d\'onglet</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Afficher les boutons de fermeture d\'onglet sur chaque élément de la liste d\'onglets</string>
     <string name="pref_title_crash_report">Rapports de plantage</string>
     <string name="pref_title_analytics">Analytiques</string>
     <string name="pref_title_pull_to_refresh">Tirer pour actualiser</string>

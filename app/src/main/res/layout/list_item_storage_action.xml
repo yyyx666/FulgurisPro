@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+ The one cell of the last row of the records table, the way to add a record. It spans the table: it
+ stands for no record, only for itself. RowAdapter gives it the width of the table it closes, so that
+ it reaches as far as the columns above it however many of them there are.
+
+ Like a record cell it is a touch target of its own, and gets its own press feedback for it.
+-->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/storageActionCell"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:ellipsize="end"
+    android:maxLines="1"
+    android:paddingEnd="@dimen/material_grid_unit"
+    android:textColor="?attr/colorPrimary"
+    android:textSize="14sp" />

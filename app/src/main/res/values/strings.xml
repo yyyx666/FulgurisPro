@@ -408,8 +408,6 @@
     <string name="pref_summary_locked_drawers">Tabs and Bookmarks panels can\'t be dragged</string>
     <string name="pref_title_use_bottom_sheets">Use bottom sheets</string>
     <string name="pref_summary_use_bottom_sheets">Tabs and Bookmarks are shown in bottom sheets instead of side drawers</string>
-    <string name="pref_title_tab_list_item_show_close_button">Show close tab button</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Display close tab buttons on tab list items</string>
     <string name="pref_title_crash_report">Crash reports</string>
     <string name="pref_title_analytics">Analytics</string>
     <string name="pref_title_pull_to_refresh">Pull to refresh</string>
@@ -630,6 +628,7 @@
     <string name="cookie_item_domain">Domain</string>
     <string name="cookie_item_path">Path</string>
     <string name="cookie_item_domain_path_hint">Optional, when empty the cookie applies to the current page</string>
+    <string name="cookie_item_attributes">Attributes</string>
     <string name="cookie_invalid_name">Name cannot be empty</string>
     <string name="question_delete_all_page_cookies">Delete all cookies for current page?</string>
 
@@ -854,6 +853,22 @@
     <string name="request_domain">Domain</string>
     <string name="request_path">Path</string>
     <string name="request_parameters">Parameters</string>
+    <string name="request_tab_request">Request</string>
+    <string name="request_tab_response">Response</string>
+    <string name="request_filter_method">Filter method</string>
+    <string name="request_filter_type">Filter type</string>
+    <string name="request_filter_url">Filter URL</string>
+    <string name="request_filter_all">All</string>
+    <string name="request_no_match">No request matches this filter</string>
+    <string name="request_type_html">HTML</string>
+    <string name="request_type_css">CSS</string>
+    <string name="request_type_js">JS</string>
+    <string name="request_type_xhr">XHR</string>
+    <string name="request_type_fonts">Fonts</string>
+    <string name="request_type_images">Images</string>
+    <string name="request_type_media">Media</string>
+    <string name="request_type_ws">WS</string>
+    <string name="request_type_other">Other</string>
     <string name="request_timestamp">Timestamp</string>
     <string name="request_network">Network</string>
     <string name="request_method">Method</string>
@@ -862,6 +877,7 @@
     <string name="request_duration">Duration</string>
     <string name="request_duration_value">%1$d ms</string>
     <string name="request_headers">Request headers</string>
+    <string name="request_response_headers">Response headers</string>
     <string name="request_headers_none">No header reported</string>
     <string name="request_body">Response body</string>
     <string name="request_body_view">View body</string>
@@ -872,6 +888,10 @@
     <string name="request_body_truncated">%1$s, first part only</string>
     <string name="request_body_unavailable_webview">Not captured: only the OkHttp or HttpUrlConnection network engine provides response bodies, see Settings – Network engine</string>
     <string name="request_body_unavailable_method">Not captured: WebView handles this request itself, it has no response body we can read</string>
+    <string name="request_body_unavailable_blocked">Not captured: the request was blocked</string>
+    <string name="request_body_unavailable_evicted">Not captured: we had this body but dropped it to save memory</string>
+    <string name="request_body_unavailable_engine">Not captured: the network engine returned no body for this request</string>
+    <string name="request_body_not_an_image">The response could not be decoded as an image</string>
     <string name="request_main_frame">Main frame</string>
     <string name="request_unknown_value">Unknown</string>
     <string name="action_page_requests">Requests</string>
@@ -924,6 +944,52 @@
     <plurals name="pref_summary_storage_items">
         <item quantity="one">One item</item>
         <item quantity="other"><xliff:g id="items_count" example="4">%d</xliff:g> items</item>
+    </plurals>
+    <string name="pref_category_title_storage_idb">IndexedDB</string>
+    <string name="pref_category_title_storage_caches">Cache storage</string>
+    <string name="storage_idb_unsupported">IndexedDB is not available for this page</string>
+    <string name="storage_idb_empty">No databases</string>
+    <string name="storage_idb_no_store">This database has no object store</string>
+    <string name="storage_cache_unsupported">Cache storage is not available for this page</string>
+    <string name="storage_cache_empty">No caches</string>
+    <string name="storage_cache_no_request">This cache is empty</string>
+    <string name="storage_idb_add">Add record</string>
+    <string name="storage_record_new_title">New record</string>
+    <string name="storage_record_edit_title">Edit record</string>
+    <string name="storage_idb_record_key">Key (JSON)</string>
+    <string name="storage_idb_record_key_optional">Key (JSON, optional)</string>
+    <string name="storage_idb_key_path">Key: %s</string>
+    <string name="storage_idb_record_value">Value (JSON)</string>
+    <string name="storage_idb_invalid_key">Key is not valid JSON</string>
+    <string name="storage_idb_invalid_value">Value is not valid JSON</string>
+    <string name="storage_write_failed">Could not write to the page storage</string>
+    <string name="storage_show_partial">Showing the first %1$d of %2$d</string>
+    <string name="storage_browse_items">View items</string>
+    <string name="storage_read_failed">Could not read from the page storage</string>
+    <string name="storage_page_range">Showing %1$d to %2$d</string>
+    <string name="storage_record_too_large">This value is too large to edit here (%1$s). Only its beginning is shown.</string>
+    <string name="storage_value_not_editable">This value holds a date, a blob or something else we cannot write back. It is shown as text only.</string>
+    <string name="action_previous_page">Previous</string>
+    <string name="action_next_page">Next</string>
+    <plurals name="pref_summary_storage_databases">
+        <item quantity="one">One database</item>
+        <item quantity="other"><xliff:g id="databases_count" example="2">%d</xliff:g> databases</item>
+    </plurals>
+    <plurals name="pref_summary_storage_stores">
+        <item quantity="one">One store</item>
+        <item quantity="other"><xliff:g id="stores_count" example="2">%d</xliff:g> stores</item>
+    </plurals>
+    <plurals name="pref_summary_storage_records">
+        <item quantity="one">One record</item>
+        <item quantity="other"><xliff:g id="records_count" example="4">%d</xliff:g> records</item>
+    </plurals>
+    <plurals name="pref_summary_storage_caches">
+        <item quantity="one">One cache</item>
+        <item quantity="other"><xliff:g id="caches_count" example="2">%d</xliff:g> caches</item>
+    </plurals>
+    <plurals name="pref_summary_storage_requests">
+        <item quantity="one">One request</item>
+        <item quantity="other"><xliff:g id="requests_count" example="4">%d</xliff:g> requests</item>
     </plurals>
     <string name="action_full_menu">Full menu</string>
     <string name="pref_summary_full_menu">Show full menu</string>

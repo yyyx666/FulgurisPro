@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Вкладки и панели закладок нельзя перетащить</string>
     <string name="pref_title_use_bottom_sheets">Использовать нижние панели</string>
     <string name="pref_summary_use_bottom_sheets">Вкладки и закладки отображаются на нижних панелях вместо боковых меню</string>
-    <string name="pref_title_tab_list_item_show_close_button">Показать кнопку закрытия вкладки</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Отображать кнопки закрытия вкладок в списке вкладок</string>
     <string name="pref_title_crash_report">Отчеты о сбоях</string>
     <string name="pref_title_analytics">Аналитика</string>
     <string name="pref_title_pull_to_refresh">Потяните для обновления</string>

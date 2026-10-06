@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">A Lapok és Könyvjelzők panelek nem mozgathatóak</string>
     <string name="pref_title_use_bottom_sheets">Használjon alsó lapokat</string>
     <string name="pref_summary_use_bottom_sheets">Fülek és Könyvjelzők az alsó lapokban vannak oldalsó lapok helyett</string>
-    <string name="pref_title_tab_list_item_show_close_button">Mutasson oldalbezáró gombot</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Mutasson oldalbezáró gombokat a lapok listaelemeiben</string>
     <string name="pref_title_crash_report">Összeomlási jelentések</string>
     <string name="pref_title_analytics">Elemzések</string>
     <string name="pref_title_pull_to_refresh">Húzza le a frissítéshez</string>

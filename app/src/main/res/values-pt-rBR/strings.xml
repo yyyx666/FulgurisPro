@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Os painéis de Abas e Favoritos não poderão ser arrastados</string>
     <string name="pref_title_use_bottom_sheets">Usar folha inferior</string>
     <string name="pref_summary_use_bottom_sheets">Abas e Favoritos serão exibidos em folhas inferiores em vez de painéis laterais</string>
-    <string name="pref_title_tab_list_item_show_close_button">Mostrar botão de fechar aba</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Mostrar botão de fechar aba nos itens da lista de abas</string>
     <string name="pref_title_crash_report">Relatórios de falhas</string>
     <string name="pref_title_analytics">Análises</string>
     <string name="pref_title_pull_to_refresh">Puxar para atualizar</string>

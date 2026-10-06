@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Faner og bogmærker kan ikke trækkes</string>
     <string name="pref_title_use_bottom_sheets">Brug bundark</string>
     <string name="pref_summary_use_bottom_sheets">Faner og bogmærker vises i bundark i stedet for sideskuffer</string>
-    <string name="pref_title_tab_list_item_show_close_button">Vis luk fane-knap</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Vis luk fane-knapper på faneliste-elementer</string>
     <string name="pref_title_crash_report">Nedbrudsrapporter</string>
     <string name="pref_title_analytics">Analyser</string>
     <string name="pref_title_pull_to_refresh">Træk for at opdatere</string>

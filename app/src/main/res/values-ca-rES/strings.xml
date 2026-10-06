@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">Els panells de Pestanyes i Adreces d\'interès no es poden arrossegar</string>
     <string name="pref_title_use_bottom_sheets">Utilitza fulls inferiors</string>
     <string name="pref_summary_use_bottom_sheets">Les pestanyes i les adreces d\'interès es mostren en fulls inferiors en lloc de caixons laterals</string>
-    <string name="pref_title_tab_list_item_show_close_button">Mostra el botó de tancar pestanya</string>
-    <string name="pref_summary_tab_list_item_show_close_button">Mostra els botons de tancar pestanya als elements de la llista de pestanyes</string>
     <string name="pref_title_crash_report">Informes d\'error</string>
     <string name="pref_title_analytics">Analítiques</string>
     <string name="pref_title_pull_to_refresh">Estirar per actualitzar</string>

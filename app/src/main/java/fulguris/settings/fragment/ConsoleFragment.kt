@@ -91,8 +91,49 @@ class ConsoleFragment : AbstractSettingsFragment() {
             toolBarBound = true
             bindToolBar(requireView())
         }
+        // We show a snapshot of what the tab collected, taken in `refresh`. Without this we would
+        // only ever take it again when the user asked us to: a line the page prints while we are on
+        // screen, our own REPL output included, would wait for that - reopening the panel being the
+        // easiest way to ask.
+        currentTab()?.addConsoleMessageListener(onConsoleMessage)
         refresh()
     }
+
+    override fun onPause() {
+        super.onPause()
+        currentTab()?.removeConsoleMessageListener(onConsoleMessage)
+    }
+
+    /**
+     * Take our snapshot again, at most once per frame: a page printing in a loop is one redraw per
+     * frame here, not one per line.
+     */
+    private fun refreshSoon() {
+        if (refreshPending || !isAdded) {
+            return
+        }
+
+        val root = view ?: return
+        refreshPending = true
+        root.post {
+            refreshPending = false
+            if (isAdded) {
+                refresh()
+            }
+        }
+    }
+
+    /**
+     * The tab whose console we are showing, if we still have one.
+     */
+    private fun currentTab(): WebPageTab? =
+        (activity as? WebBrowserActivity)?.tabsManager?.currentTab
+
+    /// Handed to the tab, and held so that [onPause] can take back the very same thing
+    private val onConsoleMessage: () -> Unit = { refreshSoon() }
+
+    /// True while a [refreshSoon] is already queued
+    private var refreshPending = false
 
     /**
      * Wire our REPL input bar, filter, refresh and clear actions.
@@ -151,8 +192,7 @@ class ConsoleFragment : AbstractSettingsFragment() {
      * Snapshot the console messages of the current tab and display them.
      */
     private fun refresh() {
-        messages = (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.getConsoleMessages()
-            ?: emptyList()
+        messages = currentTab()?.getConsoleMessages() ?: emptyList()
         rebuild()
     }
 
@@ -166,7 +206,7 @@ class ConsoleFragment : AbstractSettingsFragment() {
             return
         }
 
-        val webView = (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.webView
+        val webView = currentTab()?.webView
         if (webView == null) {
             addReplEntry(ReplEntry(code, getString(R.string.console_repl_no_page)))
             return
@@ -194,7 +234,7 @@ class ConsoleFragment : AbstractSettingsFragment() {
      * Forget all console messages for the current page, ours included.
      */
     private fun clearConsole() {
-        (activity as? WebBrowserActivity)?.tabsManager?.currentTab?.clearConsoleMessages()
+        currentTab()?.clearConsoleMessages()
         messages = emptyList()
         replEntries.clear()
         rebuild()

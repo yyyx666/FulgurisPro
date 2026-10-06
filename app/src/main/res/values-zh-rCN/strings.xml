@@ -371,8 +371,6 @@
     <string name="pref_summary_locked_drawers">不能拖动标签和书签面板</string>
     <string name="pref_title_use_bottom_sheets">嵌入底部表单</string>
     <string name="pref_summary_use_bottom_sheets">标签和书签显示在底页而不是侧边抽屉中</string>
-    <string name="pref_title_tab_list_item_show_close_button">显示关闭标签页的按钮</string>
-    <string name="pref_summary_tab_list_item_show_close_button">在网页的标签上显示关闭标签页的按钮</string>
     <string name="pref_title_crash_report">崩溃报告</string>
     <string name="pref_title_analytics">统计数据</string>
     <string name="pref_title_pull_to_refresh">下拉刷新</string>
@@ -567,6 +565,7 @@
     <string name="cookie_item_domain">域名</string>
     <string name="cookie_item_path">路径</string>
     <string name="cookie_item_domain_path_hint">可选，留空时 cookie 作用于当前页面</string>
+    <string name="cookie_item_attributes">属性</string>
     <string name="cookie_invalid_name">名称不能为空</string>
     <string name="question_delete_all_page_cookies">删除当前页面的所有 cookie 吗？</string>
     <plurals name="pref_summary_cookies">
@@ -734,6 +733,22 @@
     <string name="request_domain">域名</string>
     <string name="request_path">路径</string>
     <string name="request_parameters">参数</string>
+    <string name="request_tab_request">请求</string>
+    <string name="request_tab_response">响应</string>
+    <string name="request_filter_method">过滤方法</string>
+    <string name="request_filter_type">过滤类型</string>
+    <string name="request_filter_url">过滤 URL</string>
+    <string name="request_filter_all">全部</string>
+    <string name="request_no_match">没有符合过滤条件的请求</string>
+    <string name="request_type_html">HTML</string>
+    <string name="request_type_css">CSS</string>
+    <string name="request_type_js">JS</string>
+    <string name="request_type_xhr">XHR</string>
+    <string name="request_type_fonts">字体</string>
+    <string name="request_type_images">图片</string>
+    <string name="request_type_media">媒体</string>
+    <string name="request_type_ws">WS</string>
+    <string name="request_type_other">其他</string>
     <string name="request_timestamp">时间戳</string>
     <string name="request_network">网络</string>
     <string name="request_method">方法</string>
@@ -742,6 +757,7 @@
     <string name="request_duration">耗时</string>
     <string name="request_duration_value">%1$d 毫秒</string>
     <string name="request_headers">请求头</string>
+    <string name="request_response_headers">响应头</string>
     <string name="request_headers_none">没有请求头信息</string>
     <string name="request_body">响应体</string>
     <string name="request_body_view">查看响应体</string>
@@ -752,6 +768,10 @@
     <string name="request_body_truncated">%1$s，仅前一部分</string>
     <string name="request_body_unavailable_webview">未捕获：只有 OkHttp 或 HttpUrlConnection 网络引擎会提供响应体，请见 设置 – 网络引擎</string>
     <string name="request_body_unavailable_method">未捕获：该请求由 WebView 自行处理，没有可读取的响应体</string>
+    <string name="request_body_unavailable_blocked">未捕获：该请求已被阻止</string>
+    <string name="request_body_unavailable_evicted">未捕获：曾捕获到该响应体，但为节省内存已丢弃</string>
+    <string name="request_body_unavailable_engine">未捕获：网络引擎没有为该请求返回响应体</string>
+    <string name="request_body_not_an_image">该响应无法按图片解码</string>
     <string name="request_main_frame">主框架</string>
     <string name="request_unknown_value">未知</string>
     <string name="action_page_requests">请求</string>
@@ -803,6 +823,47 @@
     <string name="storage_origin_unknown">未知来源</string>
     <plurals name="pref_summary_storage_items">
         <item quantity="other">%d 个项目</item>
+    </plurals>
+    <string name="pref_category_title_storage_idb">IndexedDB</string>
+    <string name="pref_category_title_storage_caches">缓存存储</string>
+    <string name="storage_idb_unsupported">此页面不支持 IndexedDB</string>
+    <string name="storage_idb_empty">没有数据库</string>
+    <string name="storage_idb_no_store">该数据库没有仓库</string>
+    <string name="storage_cache_unsupported">此页面不支持缓存存储</string>
+    <string name="storage_cache_empty">没有缓存</string>
+    <string name="storage_cache_no_request">该缓存没有请求</string>
+    <string name="storage_idb_add">添加记录</string>
+    <string name="storage_record_new_title">新建记录</string>
+    <string name="storage_record_edit_title">编辑记录</string>
+    <string name="storage_idb_record_key">键（JSON）</string>
+    <string name="storage_idb_record_key_optional">键（JSON，可选）</string>
+    <string name="storage_idb_key_path">键：%s</string>
+    <string name="storage_idb_record_value">值（JSON）</string>
+    <string name="storage_idb_invalid_key">键不是合法的 JSON</string>
+    <string name="storage_idb_invalid_value">值不是合法的 JSON</string>
+    <string name="storage_write_failed">无法写入页面存储</string>
+    <string name="storage_show_partial">显示前 %1$d 条，共 %2$d 条</string>
+    <string name="storage_browse_items">查看条目</string>
+    <string name="storage_read_failed">无法读取页面存储</string>
+    <string name="storage_page_range">显示第 %1$d–%2$d 条</string>
+    <string name="storage_record_too_large">该值过大，无法在此编辑（%1$s）。此处只显示开头部分。</string>
+    <string name="storage_value_not_editable">该值含日期、Blob 等我们无法写回的内容，只能这样看。</string>
+    <string name="action_previous_page">上一页</string>
+    <string name="action_next_page">下一页</string>
+    <plurals name="pref_summary_storage_databases">
+        <item quantity="other">%d 个数据库</item>
+    </plurals>
+    <plurals name="pref_summary_storage_stores">
+        <item quantity="other">%d 个仓库</item>
+    </plurals>
+    <plurals name="pref_summary_storage_records">
+        <item quantity="other">%d 条记录</item>
+    </plurals>
+    <plurals name="pref_summary_storage_caches">
+        <item quantity="other">%d 个缓存</item>
+    </plurals>
+    <plurals name="pref_summary_storage_requests">
+        <item quantity="other">%d 个请求</item>
     </plurals>
     <string name="action_full_menu">完整菜单</string>
     <string name="pref_summary_full_menu">显示完整菜单</string>

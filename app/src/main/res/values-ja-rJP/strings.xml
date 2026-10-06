@@ -368,8 +368,6 @@
     <string name="pref_summary_locked_drawers">タブとブックマークパネルをドラッグすることはできません</string>
     <string name="pref_title_use_bottom_sheets">ボトムシートを使う</string>
     <string name="pref_summary_use_bottom_sheets">タブとブックマークはサイドドロワーの代わりにボトムシートに表示されます</string>
-    <string name="pref_title_tab_list_item_show_close_button">タブを閉じるボタンを表示</string>
-    <string name="pref_summary_tab_list_item_show_close_button">タブ一覧の項目にタブを閉じるボタンを表示する</string>
     <string name="pref_title_crash_report">クラッシュレポート</string>
     <string name="pref_title_analytics">統計情報</string>
     <string name="pref_title_pull_to_refresh">画面を引き下げて更新</string>
