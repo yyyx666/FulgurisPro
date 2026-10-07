@@ -13,6 +13,8 @@ import fulguris.js.InvertPage
 import fulguris.js.NestedScrollDetect
 import fulguris.js.BlobDownload
 import fulguris.js.BlobHook
+import fulguris.js.NetworkObserver
+import fulguris.js.WebSocketObserver
 import fulguris.js.TextReflow
 import fulguris.js.ThemeColor
 import fulguris.js.SetMetaViewport
@@ -211,6 +213,12 @@ class AppModule {
 
     @Provides
     fun providesBlobHook(): BlobHook = mezzanine<BlobHook>()
+
+    @Provides
+    fun providesWebSocketObserver(): WebSocketObserver = mezzanine<WebSocketObserver>()
+
+    @Provides
+    fun providesNetworkObserver(): NetworkObserver = mezzanine<NetworkObserver>()
 }
 
 @Qualifier

@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8"?><!--
+  A captured body, read the way the reader asks for it: as text, as pretty printed JSON, as an
+  image, or as raw bytes. See RequestFragment.showBody.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical">
+
+    <RadioGroup
+        android:id="@+id/body_switch"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/body_view_text"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/body_view_text" />
+
+        <RadioButton
+            android:id="@+id/body_view_json"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/body_view_json" />
+
+        <RadioButton
+            android:id="@+id/body_view_image"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/body_view_image" />
+
+        <RadioButton
+            android:id="@+id/body_view_binary"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/request_body_raw" />
+
+    </RadioGroup>
+
+    <!--
+      A fixed height rather than wrap_content: a ScrollView told to wrap grows to its content and
+      then has nothing left to scroll, which would cut a long body off at the dialog's edge.
+    -->
+    <FrameLayout
+        android:id="@+id/body_content"
+        android:layout_width="match_parent"
+        android:layout_height="300dp" />
+
+</LinearLayout>

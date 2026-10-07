@@ -109,10 +109,9 @@ class NetworkEngineHttpUrlConnection : NetworkEngine {
             // We now hold the response of the last hop
             val conn = connection ?: return null
 
-            if (responseCode < 200 || responseCode >= 400) {
-                Timber.w("HttpURLConnection request failed: $responseCode ${request.url}")
-                return null // Let WebView handle failures
-            }
+            // Error responses are ours to return too: an inspector worth the name shows the status,
+            // the headers and the body of a 404 as readily as those of a 200. Handing them back to
+            // WebView instead would leave our requests panel with nothing to report but the URL.
 
             // Extract response data
             val contentType = conn.contentType
@@ -128,11 +127,13 @@ class NetworkEngineHttpUrlConnection : NetworkEngine {
                 }
             }
 
-            // Get input stream
+            // Get the response stream. `errorStream` is the one holding an error response's body -
+            // `inputStream` throws for those - so it comes first and the success stream is the
+            // fallback for 2xx and for the odd status with no error stream.
             val inputStream = try {
-                conn.inputStream
+                conn.errorStream ?: conn.inputStream
             } catch (e: Exception) {
-                // If we can't get the input stream, return empty response
+                // If we can't get either stream, return empty response
                 ByteArrayInputStream(ByteArray(0))
             }
 

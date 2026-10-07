@@ -702,6 +702,8 @@
     <string name="request_parameters">參數</string>
     <string name="request_timestamp">時間戳記</string>
     <string name="action_page_requests">請求</string>
+    <string name="action_page_source">檢視網頁原始碼</string>
+    <string name="page_source">網頁原始碼</string>
     <string name="page_requests_blocked">已封鎖</string>
     <string name="page_requests_allowed">已允許</string>
     <string name="page_requests_summary">%1$d 總計 – %2$d 已封鎖 / %3$d 已允許</string>

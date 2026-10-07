@@ -15,6 +15,8 @@ import fulguris.js.InvertPage
 import fulguris.js.NestedScrollDetect
 import fulguris.js.BlobDownload
 import fulguris.js.BlobHook
+import fulguris.js.NetworkObserver
+import fulguris.js.WebSocketObserver
 import fulguris.js.SetMetaViewport
 import fulguris.js.TextReflow
 import fulguris.js.ThemeColor
@@ -64,6 +66,8 @@ interface HiltEntryPoint {
     val nestedScrollDetectJs: NestedScrollDetect
     val blobDownloadJs: BlobDownload
     val blobHookJs: BlobHook
+    val webSocketObserverJs: WebSocketObserver
+    val networkObserverJs: NetworkObserver
     val homePageFactory: HomePageFactory
     val abpBlockerManager: AbpBlockerManager
     val noopBlocker: NoOpAdBlocker

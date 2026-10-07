@@ -17,6 +17,8 @@ import android.webkit.JavascriptInterface
 import android.webkit.MimeTypeMap
 import android.webkit.WebView
 import androidx.core.text.parseAsHtml
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import fulguris.R
 import fulguris.di.configPrefs
@@ -57,6 +59,48 @@ class WebViewEx : WebView {
     private fun initNestedScrollDetection() {
         addJavascriptInterface(NestedScrollBridge(), NESTED_SCROLL_JS_INTERFACE)
         addJavascriptInterface(BlobDownloadBridge(), BLOB_JS_INTERFACE)
+        addJavascriptInterface(NetworkObserverBridge(), NETWORK_JS_INTERFACE)
+    }
+
+    /**
+     * True once [installDocumentStartScripts] has taken care of our page-side observers, telling
+     * [WebPageClient] that its own late injection is not needed.
+     */
+    @Volatile
+    var observersInstalledAtDocumentStart = false
+        private set
+
+    /**
+     * Put our page-side observers in place ahead of every page's own scripts.
+     *
+     * [WebView.evaluateJavascript] from `onPageStarted` is too late for this: by the time it runs
+     * the document is already being parsed, so a page sending its first request from an inline
+     * `<script>` - which is the common case - does so through the native `fetch` and
+     * `XMLHttpRequest` and we never see the body or the status. The WebKit document-start API runs
+     * our script on the new document before any of the page's own, which is the only thing that
+     * covers them. See [NetworkObserver.js] and [WebSocketObserver.js].
+     *
+     * A WebView too old for the feature is left to the `onPageStarted` fallback: our observers
+     * still work there, just too late for whatever the page sends while it loads.
+     */
+    fun installDocumentStartScripts(networkObserver: String, webSocketObserver: String) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)) {
+            Timber.w("Document-start scripts unsupported, page observers will install late")
+            return
+        }
+
+        // Every origin, subframes included: a page's requests are often made from an embedded one
+        val origins = setOf("*")
+        for (script in listOf(networkObserver, webSocketObserver)) {
+            try {
+                WebViewCompat.addDocumentStartJavaScript(this, script, origins)
+            } catch (e: Exception) {
+                // A script we could not install is a hole in the inspector, not a broken browser
+                Timber.w(e, "Could not install a document-start script")
+            }
+        }
+
+        observersInstalledAtDocumentStart = true
     }
 
     /**
@@ -190,9 +234,28 @@ class WebViewEx : WebView {
         }
     }
 
+    /**
+     * JavaScript interface for the fetch/XHR exchanges our injected observer reports.
+     *
+     * See [NetworkObserver.js]: WebView hands us no request body and, for a request it networks
+     * itself, no response either, so the page's own view of its requests is the only one that has
+     * both. Reports arrive on a WebView thread and are handed to the client on the main one.
+     */
+    inner class NetworkObserverBridge {
+        @JavascriptInterface
+        fun onNetworkReport(json: String) {
+            Handler(Looper.getMainLooper()).post {
+                if (::proxy.isInitialized) {
+                    proxy.webPageClient.recordNetworkReport(json)
+                }
+            }
+        }
+    }
+
     companion object {
         const val NESTED_SCROLL_JS_INTERFACE = "_fulgurisScroll"
         const val BLOB_JS_INTERFACE = "_fulgurisBlobDownload"
+        const val NETWORK_JS_INTERFACE = "_fulgurisNetwork"
     }
 
     override fun dispatchKeyEvent(event: KeyEvent?): Boolean {

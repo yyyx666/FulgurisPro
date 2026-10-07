@@ -52,6 +52,30 @@ android.productFlavors.all { flavor ->
 // TODO: Find a way to put it the variant/type folder such as: generated/source/locale/slionsFullDownload/debug/acr/browser/lightning/locale
 def generatedLocaleListDir = layout.buildDirectory.dir('generated/source/locale/fulguris/locale')
 
+// Release signing, kept out of the repository: keystore.properties (gitignored,
+// along with the key file itself) holds the keystore and the credentials for it.
+// Without that file the release variant is built unsigned, which is what a clone
+// without the key gets - and the only thing CI can produce.
+//
+// Looked for under sign/ first, then at the root of the repository: sign/ is
+// gitignored wholesale and is where the key is kept. storeFile is taken as
+// relative to the keystore.properties naming it, so moving the pair around means
+// moving them together and nothing else.
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = [rootProject.file('sign/keystore.properties'),
+                              rootProject.file('keystore.properties')]
+        .find { it.exists() }
+def releaseSigning = keystorePropertiesFile != null
+if (releaseSigning) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+/** The release keystore, as keystore.properties names it. */
+def releaseKeystoreFile = {
+    def named = new File(keystoreProperties['storeFile'])
+    named.absolute ? named : new File(keystorePropertiesFile.parentFile, keystoreProperties['storeFile'])
+}
+
 android {
     compileSdk = libs.versions.compileSdk.get().toInteger()
     // Specify namespace for generated R and BuildConfig classes
@@ -67,6 +91,18 @@ android {
         main {
             java {
                 srcDirs += generatedLocaleListDir
+            }
+        }
+    }
+
+    signingConfigs {
+        if (releaseSigning) {
+            release {
+                storeFile releaseKeystoreFile()
+                storeType keystoreProperties['storeType']
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
             }
         }
     }
@@ -96,7 +132,11 @@ android {
             proguardFiles getDefaultProguardFile(
                     'proguard-android-optimize.txt'),
                     'proguard-project.txt'
-            // Use debug signing for now
+            // Signed with the release key when we have it, see keystore.properties
+            if (releaseSigning) {
+                signingConfig signingConfigs.release
+            }
+            // Otherwise, use debug signing for now
             //signingConfig debug.signingConfig
 
             ndk {
@@ -527,7 +567,9 @@ mezzanine {
             "src/main/js/ThemeColor.js",
             "src/main/js/NestedScrollDetect.js",
             "src/main/js/BlobDownload.js",
-            "src/main/js/BlobHook.js"
+            "src/main/js/BlobHook.js",
+            "src/main/js/WebSocketObserver.js",
+            "src/main/js/NetworkObserver.js"
     )
 }
 

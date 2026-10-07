@@ -28,6 +28,7 @@ import fulguris.js.InvertPage
 import fulguris.js.NestedScrollDetect
 import fulguris.js.SetMetaViewport
 import fulguris.js.TextReflow
+import fulguris.js.WebSocketObserver
 import fulguris.network.CapturedBody
 import fulguris.network.CustomHeaderInterceptor
 import fulguris.network.MAX_CAPTURED_BODIES_SIZE
@@ -39,6 +40,7 @@ import fulguris.settings.preferences.UserPreferences
 import fulguris.ssl.SslState
 import fulguris.userscript.UserScript
 import fulguris.utils.*
+import org.json.JSONObject
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.app.Dialog
@@ -102,6 +104,8 @@ class WebPageClient(
     val setMetaViewport: SetMetaViewport = hiltEntryPoint.setMetaViewport
     val nestedScrollDetectJs: NestedScrollDetect = hiltEntryPoint.nestedScrollDetectJs
     val blobHookJs: fulguris.js.BlobHook = hiltEntryPoint.blobHookJs
+    val webSocketObserverJs: WebSocketObserver = hiltEntryPoint.webSocketObserverJs
+    val networkObserverJs: fulguris.js.NetworkObserver = hiltEntryPoint.networkObserverJs
     val homePageFactory: HomePageFactory = hiltEntryPoint.homePageFactory
     val abpBlockerManager: AbpBlockerManager = hiltEntryPoint.abpBlockerManager
     val noopBlocker: NoOpAdBlocker = hiltEntryPoint.noopBlocker
@@ -138,23 +142,41 @@ class WebPageClient(
         val isMainFrame: Boolean = false,
         val resourceType: String? = null,
         val statusCode: Int? = null,
+        val statusText: String? = null,
         val mimeType: String? = null,
         val requestHeaders: Map<String, String> = emptyMap(),
         // Headers of the response, only known when an engine handled the request
         val responseHeaders: Map<String, String> = emptyMap(),
         val durationMs: Long? = null,
-        // Handle of the captured response body in [responseBodies], null when we captured none
+        // Handle of the captured response body in [capturedBodies], null when we captured none
         val bodyId: Long? = null,
         val bodySize: Long? = null,
-        val bodyTruncated: Boolean = false
+        val bodyTruncated: Boolean = false,
+        // Same three for the request payload, only known when our page-side observer reported it,
+        // see [recordNetworkReport]
+        val requestBodyId: Long? = null,
+        val requestBodySize: Long? = null,
+        val requestBodyTruncated: Boolean = false,
+        // A request that never got an answer at all, as the page-side observer reported it
+        val error: String? = null,
+        // WebSocket rows only: the lifecycle our page-side observer last reported, null for a
+        // request that is not a WebSocket, see [recordWebSocketReport]
+        val webSocketState: String? = null
     )
 
     private val pageRequests = mutableListOf<PageRequest>()
 
-    // Response bodies we captured, keyed by the handle stored on the matching [PageRequest].
+    // Our page-side WebSocket observer (see WebSocketObserver.js) identifies each socket with its
+    // own id rather than a URL, so that two sockets to the same URL stay two rows. This maps that id
+    // to the row we made for it, letting an `open` or `close` land on the row `connecting` created.
+    private val webSocketRows = mutableMapOf<Int, PageRequest>()
+
+    // Bodies we captured, keyed by the handle stored on the matching [PageRequest]: response bodies
+    // teed off a network engine, request payloads reported by our page-side observer. The two share
+    // the one store, both being bounded the same way and worth exactly as much as the other.
     // Bounded by [MAX_CAPTURED_BODIES_SIZE], oldest evicted first.
-    private val responseBodies = LinkedHashMap<Long, CapturedBody>()
-    private var responseBodiesSize = 0L
+    private val capturedBodies = LinkedHashMap<Long, CapturedBody>()
+    private var capturedBodiesSize = 0L
     private var nextBodyId = 0L
 
     /**
@@ -163,10 +185,11 @@ class WebPageClient(
     fun getPageRequests(): List<PageRequest> = pageRequests.toList()
 
     /**
-     * Get the response body captured for [id], or null when we have none.
+     * Get the body captured for [id], request payload or response body alike, or null when we have
+     * none.
      */
-    fun getResponseBody(id: Long): CapturedBody? = synchronized(responseBodies) {
-        responseBodies[id]
+    fun getCapturedBody(id: Long): CapturedBody? = synchronized(capturedBodies) {
+        capturedBodies[id]
     }
 
     /**
@@ -210,6 +233,192 @@ class WebPageClient(
     }
 
     /**
+     * Handle one `fulguris: ws:` report from our page-side observer, see [WebSocketObserver.js].
+     *
+     * A WebSocket never reaches [shouldInterceptRequest], so this is the only way its connection
+     * shows up in our network panel at all. [json] is the small payload the observer sent; we parse
+     * it leniently, a report we cannot read being a page we cannot observe rather than an error worth
+     * surfacing.
+     */
+    fun recordWebSocketReport(json: String) {
+        val report = try {
+            JSONObject(json)
+        } catch (e: Exception) {
+            Timber.w(e, "Ignoring malformed WebSocket report")
+            return
+        }
+
+        val id = report.optInt("id", -1)
+        val url = report.optString("url")
+        val state = report.optString("state")
+        if (id < 0 || url.isEmpty() || state.isEmpty()) {
+            return
+        }
+
+        recordWebSocketEvent(
+            webSocketId = id,
+            url = url,
+            state = state,
+            protocol = report.optString("protocol").takeIf { it.isNotEmpty() },
+            code = report.optInt("code", -1).takeIf { it >= 0 },
+            reason = report.optString("reason").takeIf { it.isNotEmpty() }
+        )
+    }
+
+    /**
+     * A string member of [name], or null when it is absent or an explicit JSON null.
+     *
+     * Not `optString` alone: that renders a JSON null as the four letter word "null", and every
+     * field here is one the observer leaves out rather than fills when it has nothing to say.
+     */
+    private fun JSONObject.optNullableString(name: String): String? =
+        if (isNull(name)) null else optString(name).takeIf { it.isNotEmpty() }
+
+    /**
+     * Handle one report from our page-side `fetch`/`XMLHttpRequest` observer, see
+     * [NetworkObserver.js].
+     *
+     * WebView tells us nothing about a request's body, and nothing at all about a response it
+     * networked itself. The page's own fetch and XHR are the vantage point that does have both, so
+     * this folds what the observer saw into the row [shouldInterceptRequest] already recorded for
+     * that exchange, or adds a row when it reported one we never saw.
+     *
+     * Reports are matched on URL and method, taking the oldest row still missing an outcome: a page
+     * polling one endpoint then gets one row per exchange, in the order they completed.
+     */
+    fun recordNetworkReport(json: String) {
+        val report = try {
+            JSONObject(json)
+        } catch (e: Exception) {
+            Timber.w(e, "Ignoring malformed network report")
+            return
+        }
+
+        val url = report.optNullableString("url") ?: return
+        val method = report.optString("method").uppercase()
+
+        // Our observer only ever sees a fetch or an XHR, so we can name the type even when the
+        // request headers left [guessResourceType] guessing
+        val resourceType = report.optString("kind").takeIf { it.isNotEmpty() } ?: "xhr"
+
+        val requestBody = report.optNullableString("requestBody")?.let {
+            storeCapturedBody(CapturedBody(it.toByteArray(), report.optBoolean("requestBodyTruncated")))
+        }
+        val responseBody = report.optNullableString("body")?.let {
+            storeCapturedBody(CapturedBody(it.toByteArray(), report.optBoolean("bodyTruncated")))
+        }
+        val status = report.optInt("status", -1).takeIf { it > 0 }
+        val headers = report.optJSONObject("headers")?.let { headers ->
+            headers.keys().asSequence().associateWith { headers.optString(it) }
+        }
+
+        synchronized(pageRequests) {
+            val index = pageRequests.indexOfFirst {
+                it.url == url &&
+                        it.method.equals(method, ignoreCase = true) &&
+                        it.statusCode == null &&
+                        it.error == null &&
+                        it.webSocketState == null
+            }
+
+            val base = if (index >= 0) {
+                pageRequests[index]
+            } else {
+                PageRequest(url = url, wasBlocked = false, method = method)
+            }
+
+            // Only what we were actually told: a field the observer stayed silent about is not a
+            // field that became empty, and a row an engine already completed keeps its own answer
+            val updated = base.copy(
+                resourceType = base.resourceType ?: resourceType,
+                statusCode = status ?: base.statusCode,
+                statusText = report.optNullableString("statusText") ?: base.statusText,
+                mimeType = report.optNullableString("mime") ?: base.mimeType,
+                responseHeaders = headers ?: base.responseHeaders,
+                durationMs = report.optLong("duration", -1).takeIf { it >= 0 } ?: base.durationMs,
+                bodyId = responseBody ?: base.bodyId,
+                bodySize = report.optNullableString("body")?.length?.toLong() ?: base.bodySize,
+                bodyTruncated = if (responseBody != null) {
+                    report.optBoolean("bodyTruncated")
+                } else {
+                    base.bodyTruncated
+                },
+                requestBodyId = requestBody ?: base.requestBodyId,
+                requestBodySize = report.optNullableString("requestBody")?.length?.toLong()
+                    ?: base.requestBodySize,
+                requestBodyTruncated = if (requestBody != null) {
+                    report.optBoolean("requestBodyTruncated")
+                } else {
+                    base.requestBodyTruncated
+                },
+                error = report.optNullableString("error") ?: base.error
+            )
+
+            if (index >= 0) {
+                pageRequests[index] = updated
+            } else {
+                pageRequests.add(updated)
+            }
+        }
+    }
+
+    /**
+     * Record or update the row of a WebSocket connection our page-side observer reported.
+     *
+     * Keyed by [webSocketId], the observer's own id: the `open`, `error` and `closed` reports of one
+     * socket update the row its `connecting` report created, instead of piling new rows up.
+     */
+    private fun recordWebSocketEvent(
+        webSocketId: Int,
+        url: String,
+        state: String,
+        protocol: String?,
+        code: Int?,
+        reason: String?
+    ) {
+        val display = webSocketStateLabel(state, protocol, code, reason)
+
+        synchronized(pageRequests) {
+            // Only reuse a row still in the list: navigating away clears our requests, and a stale
+            // reference must not resurrect the previous page's socket
+            val known = webSocketRows[webSocketId]?.takeIf { pageRequests.contains(it) }
+            if (known != null) {
+                val updated = known.copy(webSocketState = display)
+                pageRequests[pageRequests.indexOf(known)] = updated
+                webSocketRows[webSocketId] = updated
+                return
+            }
+
+            val request = PageRequest(
+                url = url,
+                wasBlocked = false,
+                resourceType = "websocket",
+                webSocketState = display
+            )
+            pageRequests.add(request)
+            webSocketRows[webSocketId] = request
+        }
+    }
+
+    /**
+     * The one line we show for a WebSocket's state, carrying the details worth keeping: the
+     * negotiated subprotocol once it is open, the close code and reason once it is closed.
+     */
+    private fun webSocketStateLabel(
+        state: String,
+        protocol: String?,
+        code: Int?,
+        reason: String?
+    ): String = when (state) {
+        "open" -> listOfNotNull("open", protocol).joinToString(" · ")
+        "closed" -> {
+            val details = listOfNotNull(code?.toString(), reason)
+            if (details.isEmpty()) "closed" else "closed · " + details.joinToString(" ")
+        }
+        else -> state
+    }
+
+    /**
      * Capture the body of [response] for the network inspector, see [captureBody].
      *
      * The response keeps the whole body, we only tee off a prefix of it. Returns the handle under
@@ -228,23 +437,28 @@ class WebPageClient(
         }
 
         response.data = capture.stream
+        return storeCapturedBody(capture.body) to capture.body
+    }
 
-        synchronized(responseBodies) {
-            val id = nextBodyId++
-            responseBodies[id] = capture.body
-            responseBodiesSize += capture.body.size
-            evictResponseBodies()
-            return id to capture.body
-        }
+    /**
+     * Record [body] under a fresh handle, evicting the oldest ones to stay within
+     * [MAX_CAPTURED_BODIES_SIZE].
+     */
+    private fun storeCapturedBody(body: CapturedBody): Long = synchronized(capturedBodies) {
+        val id = nextBodyId++
+        capturedBodies[id] = body
+        capturedBodiesSize += body.size
+        evictCapturedBodies()
+        id
     }
 
     /**
      * Drop the oldest captured bodies until we are back within [MAX_CAPTURED_BODIES_SIZE].
      */
-    private fun evictResponseBodies() {
-        val iterator = responseBodies.entries.iterator()
-        while (responseBodiesSize > MAX_CAPTURED_BODIES_SIZE && iterator.hasNext()) {
-            responseBodiesSize -= iterator.next().value.size
+    private fun evictCapturedBodies() {
+        val iterator = capturedBodies.entries.iterator()
+        while (capturedBodiesSize > MAX_CAPTURED_BODIES_SIZE && iterator.hasNext()) {
+            capturedBodiesSize -= iterator.next().value.size
             iterator.remove()
         }
     }
@@ -253,16 +467,18 @@ class WebPageClient(
      * Forget the captured bodies no longer referenced by a tracked request.
      *
      * Called after requests are cleared, otherwise every navigation would leak up to
-     * [MAX_CAPTURED_BODIES_SIZE] of response bodies.
+     * [MAX_CAPTURED_BODIES_SIZE] of bodies.
      */
-    private fun pruneResponseBodies() {
-        synchronized(responseBodies) {
-            val live = synchronized(pageRequests) { pageRequests.mapNotNull { it.bodyId }.toSet() }
-            val iterator = responseBodies.entries.iterator()
+    private fun pruneCapturedBodies() {
+        synchronized(capturedBodies) {
+            val live = synchronized(pageRequests) {
+                pageRequests.flatMap { listOfNotNull(it.bodyId, it.requestBodyId) }.toSet()
+            }
+            val iterator = capturedBodies.entries.iterator()
             while (iterator.hasNext()) {
                 val entry = iterator.next()
                 if (entry.key !in live) {
-                    responseBodiesSize -= entry.value.size
+                    capturedBodiesSize -= entry.value.size
                     iterator.remove()
                 }
             }
@@ -313,8 +529,10 @@ class WebPageClient(
             } else {
                 pageRequests.clear()
             }
+            // WebSocket rows are never main frame ones, so they all went with the clear
+            webSocketRows.clear()
         }
-        pruneResponseBodies()
+        pruneCapturedBodies()
     }
 
 //    private var elementHide = userPreferences.elementHide
@@ -719,6 +937,18 @@ class WebPageClient(
                 Timber.d("Injecting DOCUMENT_START userscripts for $url")
                 view.evaluateJavascript(scriptCode, null)
             }
+        }
+
+        // Wrap the page's WebSocket constructor and its fetch/XHR before the page gets a chance to
+        // build either: a site may open a socket or send its first request from an inline <script>,
+        // and once that has run our wrappers would be too late to see it. Normally
+        // WebViewEx.installDocumentStartScripts has already done this ahead of the page's own
+        // scripts - see there for why this call cannot be relied upon - so this only covers a
+        // WebView too old for that API. Not gated on extensionsEnabled: this is core inspector
+        // plumbing rather than a user extension.
+        if (view.settings.javaScriptEnabled && !(view as WebViewEx).observersInstalledAtDocumentStart) {
+            view.evaluateJavascript(webSocketObserverJs.provideJs(), null)
+            view.evaluateJavascript(networkObserverJs.provideJs(), null)
         }
 
         (view as WebViewEx).proxy.apply {
@@ -1464,6 +1694,29 @@ class WebPageClient(
     ) {
         Timber.w("$ihs : onReceivedHttpError: ${request?.url} - Status: ${errorResponse?.statusCode}")
         super.onReceivedHttpError(view, request, errorResponse)
+
+        // WebView hands us here what a network engine would have reported through
+        // [updatePageRequestResponse]: the status line and the headers of a failure. For the engine
+        // we leave every request to - the default one - this is the only chance to say anything
+        // about a resource that came back in error, so we take it. The body is out of reach
+        // (`errorResponse.data` is null) and this runs on the UI thread, so we enrich the metadata
+        // only, never attempt a read.
+        val url = request?.url?.toString() ?: return
+        val status = errorResponse?.statusCode?.takeIf { it > 0 } ?: return
+        val isMainFrame = request.isForMainFrame
+
+        synchronized(pageRequests) {
+            // Recorded by shouldInterceptRequest, with its response still unknown: that is the one
+            // the failure belongs to
+            val index = pageRequests.indexOfLast { it.url == url && it.isMainFrame == isMainFrame }
+            if (index >= 0) {
+                pageRequests[index] = pageRequests[index].copy(
+                    statusCode = status,
+                    mimeType = errorResponse.mimeType ?: pageRequests[index].mimeType,
+                    responseHeaders = errorResponse.responseHeaders.orEmpty()
+                )
+            }
+        }
     }
 
     /**

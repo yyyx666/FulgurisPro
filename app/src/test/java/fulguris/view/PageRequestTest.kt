@@ -33,7 +33,25 @@ class PageRequestTest {
         // Those are only known when a network engine handled the request, see WebPageClient
         assertThat(request.resourceType).isNull()
         assertThat(request.statusCode).isNull()
+        assertThat(request.statusText).isNull()
         assertThat(request.mimeType).isNull()
         assertThat(request.durationMs).isNull()
+        // Only a request that never got an answer carries one, as our page-side observer saw it
+        assertThat(request.error).isNull()
+        // Only a WebSocket row carries one, and only once our page-side observer reported it
+        assertThat(request.webSocketState).isNull()
+    }
+
+    @Test
+    fun `body fields default to absent, for the response and the request alike`() {
+        val request = request()
+
+        assertThat(request.bodyId).isNull()
+        assertThat(request.bodySize).isNull()
+        assertThat(request.bodyTruncated).isFalse()
+        // Only our page-side fetch/XHR observer reports a request body, see recordNetworkReport
+        assertThat(request.requestBodyId).isNull()
+        assertThat(request.requestBodySize).isNull()
+        assertThat(request.requestBodyTruncated).isFalse()
     }
 }

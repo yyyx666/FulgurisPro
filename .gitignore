@@ -1,9 +1,15 @@
 n# Android Studio
 *.jks
+*.p12
+*.keystore
 .DS_Store
 /local.properties
 /.idea/workspace.xml
 /build
+
+# Release signing: the keystore (.jks, above) and the credentials for it. Keep
+# the password out of the repository, see app/build.gradle and keystore.properties.
+keystore.properties
 
 # External tool builders
 .externalToolBuilders/
@@ -69,6 +75,7 @@ playstore-*.json
 google-play-*.json
 # But DO keep google-services.json (Firebase config)
 !google-services.json
+/sign
 
 # Bundler
 vendor/bundle

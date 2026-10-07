@@ -275,6 +275,15 @@ object MenuItems {
             canBeInTabMenu = true,
             defaultMenu = MenuType.TabMenu
         ),
+        MenuItemId.ViewSource to MenuItem(
+            id = MenuItemId.ViewSource,
+            labelId = R.string.action_page_source,
+            iconId = R.drawable.ic_baseline_code_24,
+            viewId = R.id.menuItemViewSource,
+            canBeInMainMenu = true,
+            canBeInTabMenu = true,
+            defaultMenu = MenuType.TabMenu
+        ),
         MenuItemId.Console to MenuItem(
             id = MenuItemId.Console,
             labelId = R.string.action_console,

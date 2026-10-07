@@ -51,6 +51,11 @@ data class FormattedBody(val kind: BodyKind, val text: String? = null)
  * JSON documents are pretty printed for readability, falling back to the raw text when they do not
  * parse. Images are left for the caller to decode into a bitmap. Anything else is reported as
  * binary so the caller can offer the raw bytes instead.
+ *
+ * What the body holds decides before what the header claims: a `Content-Type` is the server's
+ * description of a body, not a fact about it, and one that disagrees - `application/octet-stream`
+ * over a JSON document, `application/json; charset=utf-8` read as a type we do not know - must not
+ * turn a document a reader can read into rows of hex.
  */
 fun formatBody(bytes: ByteArray, mimeType: String?, charset: String? = null): FormattedBody {
     val mime = mimeType?.substringBefore(';')?.trim()?.lowercase().orEmpty()
@@ -59,20 +64,47 @@ fun formatBody(bytes: ByteArray, mimeType: String?, charset: String? = null): Fo
         return FormattedBody(BodyKind.IMAGE)
     }
 
-    val isJson = mime == "application/json" || mime == "text/json" || mime.endsWith("+json")
-    val isText = isJson || mime.startsWith("text/") || mime.endsWith("+xml") ||
-            mime == "application/xml" || mime == "application/javascript" ||
-            mime == "application/x-javascript" || mime == "application/x-www-form-urlencoded"
+    if (couldBeJson(bytes)) {
+        val text = decodeText(bytes, charset ?: charsetOf(mimeType))
+        prettyPrintJson(text)?.let { return FormattedBody(BodyKind.JSON, it) }
+    }
 
-    if (!isText) {
+    if (!isTextual(mime)) {
         return FormattedBody(BodyKind.BINARY)
     }
 
-    val text = decodeText(bytes, charset)
-    if (isJson) {
-        prettyPrintJson(text)?.let { return FormattedBody(BodyKind.JSON, it) }
+    return FormattedBody(BodyKind.TEXT, decodeText(bytes, charset ?: charsetOf(mimeType)))
+}
+
+/**
+ * Whether a content type describes a body worth reading as text.
+ *
+ * The parameters are not part of the type: `application/json; charset=utf-8` is `application/json`,
+ * and a server that announces the charset it used must not cost us the ability to read the body.
+ * MIME parameters are stripped before this is called, see [formatBody].
+ */
+private fun isTextual(mime: String): Boolean =
+    mime == "application/json" || mime == "text/json" || mime.endsWith("+json") ||
+            mime.startsWith("text/") || mime.endsWith("+xml") ||
+            mime == "application/xml" || mime == "application/javascript" ||
+            mime == "application/x-javascript" || mime == "application/x-www-form-urlencoded"
+
+/**
+ * Whether [bytes] could open a JSON document, judged by the first byte that carries any meaning.
+ *
+ * Cheap enough to run against every captured body: a JSON document opens on an object or an array,
+ * and a PNG, a zip or a sentence of prose is ruled out without decoding a byte of it.
+ */
+private fun couldBeJson(bytes: ByteArray): Boolean {
+    for (byte in bytes) {
+        val c = byte.toInt() and 0xFF
+        // A UTF-8 byte order mark, and the whitespace JSON allows ahead of its first token
+        if (c == 0xEF || c == 0xBB || c == 0xBF || c == 0x20 || c == 0x09 || c == 0x0A || c == 0x0D) {
+            continue
+        }
+        return c == '{'.code || c == '['.code
     }
-    return FormattedBody(BodyKind.TEXT, text)
+    return false
 }
 
 /**
@@ -122,6 +154,26 @@ fun hexDump(bytes: ByteArray, maxBytes: Int = HEX_DUMP_MAX_BYTES): String {
     }
     return builder.toString()
 }
+
+/**
+ * Decode a body as text, whatever its MIME type claimed it was.
+ *
+ * The MIME type is the server's claim about a body, not a fact about it, and a JSON document served
+ * as `application/octet-stream` or with no type at all is still text. A reader who asks to see the
+ * text gets this.
+ */
+fun bodyAsText(bytes: ByteArray, mimeType: String?): String =
+    decodeText(bytes, charsetOf(mimeType))
+
+/**
+ * The charset a MIME type advertises, if it advertises one we can name.
+ */
+private fun charsetOf(mimeType: String?): String? =
+    mimeType?.substringAfter("charset=", "")
+        ?.substringBefore(';')
+        ?.trim()
+        ?.trim('"')
+        ?.takeIf { it.isNotEmpty() }
 
 /**
  * Decode a body as text, falling back to UTF-8 when the advertised charset is unknown to us.

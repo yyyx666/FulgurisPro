@@ -520,6 +520,12 @@ class WebPageTab(
         webView = activity.layoutInflater.inflate(R.layout.webview, null) as WebViewEx
         webView?.apply {
             proxy = this@WebPageTab
+            // Before anything loads: our page-side observers have to precede the page's own
+            // scripts, which rules out our other, later, injection points
+            installDocumentStartScripts(
+                webPageClient.networkObserverJs.provideJs(),
+                webPageClient.webSocketObserverJs.provideJs()
+            )
             Timber.d("WebView scrollbar defaults: ${scrollBarSize.toFloat().dp}, $scrollBarDefaultDelayBeforeFade, $scrollBarFadeDuration")
             scrollBarSize = userPreferences.scrollbarSize.px.toInt()
             isScrollbarFadingEnabled = userPreferences.scrollbarFading

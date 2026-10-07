@@ -31,11 +31,17 @@ import android.text.TextUtils
 import android.text.format.DateFormat
 import android.text.format.Formatter
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.View
+import android.view.ViewGroup
+import android.widget.FrameLayout
 import android.widget.ImageView
 import android.widget.LinearLayout
+import android.widget.RadioButton
+import android.widget.RadioGroup
 import android.widget.ScrollView
 import android.widget.TextView
+import androidx.core.view.isVisible
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -48,8 +54,10 @@ import fulguris.network.NetworkEngineManager
 import fulguris.network.parseQueryParameters
 import fulguris.utils.BodyKind
 import fulguris.utils.Utils
+import fulguris.utils.bodyAsText
 import fulguris.utils.formatBody
 import fulguris.utils.hexDump
+import fulguris.utils.prettyPrintJson
 import fulguris.view.WebPageClient
 import java.util.Date
 
@@ -74,13 +82,19 @@ class RequestFragment : AbstractSettingsFragment() {
         val isMainFrame: Boolean,
         val resourceType: String?,
         val statusCode: Int,
+        val statusText: String?,
         val mimeType: String?,
         val durationMs: Long,
         val requestHeaders: List<String>,
         val responseHeaders: List<String>,
         val bodyId: Long,
         val bodySize: Long,
-        val bodyTruncated: Boolean
+        val bodyTruncated: Boolean,
+        val requestBodyId: Long,
+        val requestBodySize: Long,
+        val requestBodyTruncated: Boolean,
+        val error: String?,
+        val webSocketState: String?
     )
 
     private lateinit var details: Details
@@ -108,13 +122,19 @@ class RequestFragment : AbstractSettingsFragment() {
             isMainFrame = arguments?.getBoolean("is_main_frame", false) ?: false,
             resourceType = arguments?.getString("resource_type"),
             statusCode = arguments?.getInt("status_code", -1) ?: -1,
+            statusText = arguments?.getString("status_text"),
             mimeType = arguments?.getString("mime_type"),
             durationMs = arguments?.getLong("duration_ms", -1L) ?: -1L,
             requestHeaders = arguments?.getStringArrayList("request_headers") ?: arrayListOf(),
             responseHeaders = arguments?.getStringArrayList("response_headers") ?: arrayListOf(),
             bodyId = arguments?.getLong("body_id", -1L) ?: -1L,
             bodySize = arguments?.getLong("body_size", -1L) ?: -1L,
-            bodyTruncated = arguments?.getBoolean("body_truncated", false) ?: false
+            bodyTruncated = arguments?.getBoolean("body_truncated", false) ?: false,
+            requestBodyId = arguments?.getLong("request_body_id", -1L) ?: -1L,
+            requestBodySize = arguments?.getLong("request_body_size", -1L) ?: -1L,
+            requestBodyTruncated = arguments?.getBoolean("request_body_truncated", false) ?: false,
+            error = arguments?.getString("error"),
+            webSocketState = arguments?.getString("web_socket_state")
         )
 
         setBackSummary(details.url)
@@ -236,6 +256,8 @@ class RequestFragment : AbstractSettingsFragment() {
         populateNetworkDetails()
 
         addHeaderCategory(R.string.request_headers, R.string.request_headers_none, details.requestHeaders)
+
+        populateRequestBody()
 
         // Timestamp category
         val timestampCategory = PreferenceCategory(requireContext()).apply {
@@ -380,10 +402,26 @@ class RequestFragment : AbstractSettingsFragment() {
 
         networkCategory.addPreference(x.Preference(requireContext()).apply {
             title = getString(R.string.request_status)
-            summary = if (details.statusCode >= 0) details.statusCode.toString() else unknown
+            summary = if (details.statusCode >= 0) {
+                listOfNotNull(details.statusCode.toString(), details.statusText).joinToString(" ")
+            } else {
+                unknown
+            }
             isIconSpaceReserved = false
             isSelectable = false
         })
+
+        // A request that never got an answer, as our page-side observer reported it: the status line
+        // above cannot say this, a fetch that fails having no status at all
+        details.error?.let { error ->
+            networkCategory.addPreference(x.Preference(requireContext()).apply {
+                title = getString(R.string.request_error)
+                summary = error
+                isIconSpaceReserved = false
+                isCopyingEnabled = true
+                isSelectable = false
+            })
+        }
 
         networkCategory.addPreference(x.Preference(requireContext()).apply {
             title = getString(R.string.request_mime)
@@ -402,6 +440,18 @@ class RequestFragment : AbstractSettingsFragment() {
             isIconSpaceReserved = false
             isSelectable = false
         })
+
+        // WebSocket connections never reach our network engine, they are reported by our injected
+        // page-side observer instead: this is the lifecycle it saw them go through.
+        details.webSocketState?.let { state ->
+            networkCategory.addPreference(x.Preference(requireContext()).apply {
+                title = getString(R.string.request_web_socket)
+                summary = state
+                isIconSpaceReserved = false
+                isCopyingEnabled = true
+                isSelectable = false
+            })
+        }
     }
 
     /**
@@ -450,6 +500,97 @@ class RequestFragment : AbstractSettingsFragment() {
     }
 
     /**
+     * Populate our request body section with the payload our page-side observer reported.
+     *
+     * Only the page's own `fetch` and `XMLHttpRequest` carry a body we can read, see
+     * `WebPageClient.recordNetworkReport`: a form submission's POST is a navigation WebView sends
+     * itself, and no API tells us what went into it.
+     */
+    private fun populateRequestBody() {
+        val category = PreferenceCategory(requireContext()).apply {
+            title = getString(R.string.request_payload)
+            isIconSpaceReserved = false
+        }
+        addDynamic(category)
+
+        val body = details.requestBodyId.takeIf { it >= 0 }?.let { webPageClient()?.getCapturedBody(it) }
+
+        if (body == null) {
+            category.addPreference(x.Preference(requireContext()).apply {
+                summary = getString(requestBodyUnavailableReason())
+                isIconSpaceReserved = false
+                isSelectable = false
+            })
+            return
+        }
+
+        // Our Content-Type is what tells us how to show the payload, the same way the response's
+        // own does for a response body
+        val formatted = formatBody(body.bytes, requestContentType())
+        val kind = if (body.truncated && formatted.kind == BodyKind.IMAGE) BodyKind.BINARY else formatted.kind
+
+        category.addPreference(x.Preference(requireContext()).apply {
+            title = getString(
+                when (kind) {
+                    BodyKind.IMAGE -> R.string.request_body_preview_image
+                    BodyKind.BINARY -> R.string.request_body_raw
+                    else -> R.string.request_payload_view
+                }
+            )
+            if (formatted.kind == BodyKind.JSON) {
+                summary = getString(R.string.request_body_json)
+            }
+            isIconSpaceReserved = true
+            setIcon(
+                when (kind) {
+                    BodyKind.IMAGE -> R.drawable.ic_image
+                    BodyKind.BINARY -> R.drawable.ic_unknown_document_outline
+                    else -> R.drawable.ic_code
+                }
+            )
+            setOnPreferenceClickListener {
+                showBody(body, kind, requestContentType(), R.string.request_payload)
+                true
+            }
+        })
+
+        category.addPreference(x.Preference(requireContext()).apply {
+            title = getString(R.string.request_body_size)
+            summary = buildSizeSummary(details.requestBodySize, details.requestBodyTruncated)
+            isIconSpaceReserved = false
+            isSelectable = false
+        })
+    }
+
+    /**
+     * The `Content-Type` we sent, if we ever saw the request's headers.
+     */
+    private fun requestContentType(): String? =
+        details.requestHeaders.firstOrNull {
+            it.substringBefore(':').trim().equals("content-type", ignoreCase = true)
+        }?.substringAfter(':')?.trim()
+
+    /**
+     * Why we have no request payload, as a string resource.
+     *
+     * Three different things keep one from us: we captured it and dropped it, the method never had
+     * one to send, or the request did not come from the page's own fetch or XHR.
+     */
+    private fun requestBodyUnavailableReason(): Int = when {
+        details.requestBodySize >= 0 -> R.string.request_payload_unavailable_evicted
+        isPayloadlessRequestMethod(details.method) -> R.string.request_payload_unavailable_method
+        else -> R.string.request_payload_unavailable_observer
+    }
+
+    /**
+     * Methods that send no body of their own, whatever the request carries.
+     */
+    private fun isPayloadlessRequestMethod(method: String): Boolean =
+        method.equals("GET", ignoreCase = true) ||
+                method.equals("HEAD", ignoreCase = true) ||
+                method.equals("OPTIONS", ignoreCase = true)
+
+    /**
      * Populate our response body section.
      *
      * We only ever capture a body from an engine that handled the request, see
@@ -463,7 +604,7 @@ class RequestFragment : AbstractSettingsFragment() {
         }
         addDynamic(category)
 
-        val body = details.bodyId.takeIf { it >= 0 }?.let { webPageClient()?.getResponseBody(it) }
+        val body = details.bodyId.takeIf { it >= 0 }?.let { webPageClient()?.getCapturedBody(it) }
 
         if (body == null) {
             category.addPreference(x.Preference(requireContext()).apply {
@@ -505,7 +646,7 @@ class RequestFragment : AbstractSettingsFragment() {
                 }
             )
             setOnPreferenceClickListener {
-                showResponseBody(body, kind, formatted.text)
+                showBody(body, kind, details.mimeType, R.string.request_body)
                 true
             }
         })
@@ -563,31 +704,73 @@ class RequestFragment : AbstractSettingsFragment() {
     }
 
     /**
-     * Show the captured body in a dialog, formatted the way [kind] calls for.
+     * Show the captured body in a dialog, letting the reader choose how to read it.
+     *
+     * [aTitle] names which body this is, the two we hold being shown the same way.
+     *
+     * [preferred] is the reading our Content-Type called for and the one we open on, [mimeType] being
+     * what that call was made from. It is not the last word on the matter: a body is bytes, and what
+     * they hold is our guess from a header the server may not even have sent, so a JSON document
+     * served as `application/octet-stream` reads as bytes under any classification. Every reading the
+     * body supports is therefore a switch away.
      */
-    private fun showResponseBody(body: CapturedBody, kind: BodyKind, text: String?) {
-        val content: View = if (kind == BodyKind.IMAGE) {
-            buildImageView(body)
-        } else {
-            buildTextView(if (kind == BodyKind.BINARY) hexDump(body.bytes) else text.orEmpty())
+    private fun showBody(body: CapturedBody, preferred: BodyKind, mimeType: String?, aTitle: Int) {
+        val view = layoutInflater.inflate(R.layout.dialog_body, null)
+        val group = view.findViewById<RadioGroup>(R.id.body_switch)
+        val container = view.findViewById<FrameLayout>(R.id.body_content)
+
+        val text = bodyAsText(body.bytes, mimeType)
+        // Decoding the body is only worth offering where it could conceivably work: there is no JSON
+        // in a document that does not parse as JSON, and no image in a body we were not told is one
+        val available = mutableSetOf(BodyKind.TEXT, BodyKind.BINARY)
+        if (prettyPrintJson(text) != null) {
+            available.add(BodyKind.JSON)
+        }
+        if (preferred == BodyKind.IMAGE) {
+            available.add(BodyKind.IMAGE)
         }
 
+        BODY_READINGS.forEach { (id, kind) ->
+            view.findViewById<RadioButton>(id).isVisible = kind in available
+        }
+
+        group.setOnCheckedChangeListener { _, checkedId ->
+            BODY_READINGS[checkedId]?.let { showReading(container, body, it, text) }
+        }
+        // Checked last, our listener being what fills the dialog with the reading we open on
+        group.check(BODY_READINGS.entries.firstOrNull { it.value == preferred }?.key ?: R.id.body_view_text)
+
         val dialog = MaterialAlertDialogBuilder(requireContext())
-            .setTitle(
-                if (kind == BodyKind.IMAGE) {
-                    getString(R.string.request_body_preview_image)
-                } else {
-                    getString(R.string.request_body)
-                }
-            )
-            .setView(content)
+            .setTitle(getString(aTitle))
+            .setView(view)
             .setPositiveButton(R.string.action_ok, null)
             .create()
 
-        // Our content was built for the current configuration, dismiss the dialog when it changes
-        content.onConfigurationChange { dialog.dismiss() }
+        // The view was built for the current configuration, dismiss the dialog when it changes
+        view.onConfigurationChange { dialog.dismiss() }
 
         dialog.show()
+    }
+
+    /**
+     * Put one reading of a captured body in the dialog, replacing whatever reading was there.
+     */
+    private fun showReading(container: FrameLayout, body: CapturedBody, kind: BodyKind, text: String) {
+        val content: View = when (kind) {
+            BodyKind.IMAGE -> buildImageView(body)
+            BodyKind.BINARY -> buildTextView(hexDump(body.bytes))
+            BodyKind.JSON -> buildTextView(prettyPrintJson(text).orEmpty())
+            BodyKind.TEXT -> buildTextView(text)
+        }
+
+        container.removeAllViews()
+        container.addView(
+            content,
+            FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
     }
 
     /**
@@ -609,7 +792,15 @@ class RequestFragment : AbstractSettingsFragment() {
             addView(view)
         }
         return LinearLayout(requireContext()).apply {
-            addView(scroll)
+            // Filling the frame we are put in, so that the ScrollView we hold scrolls instead of
+            // growing to the length of the body and being clipped
+            addView(
+                scroll,
+                LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT,
+                    ViewGroup.LayoutParams.MATCH_PARENT
+                )
+            )
         }
     }
 
@@ -641,6 +832,8 @@ class RequestFragment : AbstractSettingsFragment() {
         val padding = resources.getDimensionPixelSize(R.dimen.dialog_padding)
         return LinearLayout(requireContext()).apply {
             setPadding(padding, padding, padding, padding)
+            // A picture shorter than the frame we are given belongs in the middle of it
+            gravity = Gravity.CENTER
             addView(content)
         }
     }
@@ -656,5 +849,16 @@ class RequestFragment : AbstractSettingsFragment() {
 
     companion object {
         private const val STATE_PANE = "request_pane"
+
+        /**
+         * The readings a captured body can be shown as, keyed by the button offering each one, in
+         * the order `dialog_body` lays them out.
+         */
+        private val BODY_READINGS = linkedMapOf(
+            R.id.body_view_text to BodyKind.TEXT,
+            R.id.body_view_json to BodyKind.JSON,
+            R.id.body_view_image to BodyKind.IMAGE,
+            R.id.body_view_binary to BodyKind.BINARY
+        )
     }
 }

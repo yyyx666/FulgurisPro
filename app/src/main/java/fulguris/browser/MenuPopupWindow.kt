@@ -272,6 +272,7 @@ class MenuPopupWindow : PopupWindow {
         iBinding.menuItemAdBlock.isVisible = false
         iBinding.menuItemTranslate.isVisible = false
         iBinding.menuItemPageRequests.isVisible = false
+        iBinding.menuItemViewSource.isVisible = false
         iBinding.menuItemConsole.isVisible = false
         iBinding.menuItemCookies.isVisible = false
         iBinding.menuItemStorage.isVisible = false
@@ -317,6 +318,7 @@ class MenuPopupWindow : PopupWindow {
             MenuItemId.AdBlock -> iBinding.menuItemAdBlock.isVisible = true
             MenuItemId.Translate -> iBinding.menuItemTranslate.isVisible = true
             MenuItemId.Requests -> iBinding.menuItemPageRequests.isVisible = true
+            MenuItemId.ViewSource -> iBinding.menuItemViewSource.isVisible = true
             MenuItemId.Console -> iBinding.menuItemConsole.isVisible = true
             MenuItemId.Cookies -> iBinding.menuItemCookies.isVisible = true
             MenuItemId.Storage -> iBinding.menuItemStorage.isVisible = true
@@ -381,6 +383,7 @@ class MenuPopupWindow : PopupWindow {
                 iBinding.menuItemAdBlock.isVisible = false
                 iBinding.menuItemTranslate.isVisible = false
                 iBinding.menuItemPageRequests.isVisible = false
+                iBinding.menuItemViewSource.isVisible = false
                 iBinding.menuItemConsole.isVisible = false
                 iBinding.menuItemCookies.isVisible = false
                 iBinding.menuItemStorage.isVisible = false

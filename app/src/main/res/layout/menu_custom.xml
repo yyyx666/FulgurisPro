@@ -352,6 +352,14 @@
                         android:text="@string/action_page_requests" />
 
                     <TextView
+                        android:id="@+id/menuItemViewSource"
+                        style="@style/BrowserTextMenuItem"
+                        android:visibility="gone"
+                        tools:visibility="visible"
+                        app:drawableStartCompat="@drawable/ic_baseline_code_24"
+                        android:text="@string/action_page_source" />
+
+                    <TextView
                         android:id="@+id/menuItemConsole"
                         style="@style/BrowserTextMenuItem"
                         android:visibility="gone"

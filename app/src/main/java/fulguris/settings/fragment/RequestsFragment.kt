@@ -311,11 +311,17 @@ class RequestsFragment : AbstractSettingsFragment() {
             extras.putBoolean("is_main_frame", request.isMainFrame)
             extras.putString("resource_type", request.resourceType)
             extras.putInt("status_code", request.statusCode ?: -1)
+            extras.putString("status_text", request.statusText)
             extras.putString("mime_type", request.mimeType)
             extras.putLong("duration_ms", request.durationMs ?: -1L)
             extras.putLong("body_id", request.bodyId ?: -1L)
             extras.putLong("body_size", request.bodySize ?: -1L)
             extras.putBoolean("body_truncated", request.bodyTruncated)
+            extras.putLong("request_body_id", request.requestBodyId ?: -1L)
+            extras.putLong("request_body_size", request.requestBodySize ?: -1L)
+            extras.putBoolean("request_body_truncated", request.requestBodyTruncated)
+            extras.putString("error", request.error)
+            extras.putString("web_socket_state", request.webSocketState)
             extras.putStringArrayList(
                 "request_headers",
                 ArrayList(request.requestHeaders.map { "${it.key}: ${it.value}" })
@@ -345,6 +351,8 @@ class RequestsFragment : AbstractSettingsFragment() {
         if (request.method.isNotEmpty()) {
             parts.add(request.method)
         }
+        // A WebSocket has no status line to show, its lifecycle state is what it has instead
+        request.webSocketState?.let { parts.add(it) }
         request.statusCode?.let { parts.add(it.toString()) }
         (request.mimeType ?: request.resourceType)?.let { parts.add(it) }
 

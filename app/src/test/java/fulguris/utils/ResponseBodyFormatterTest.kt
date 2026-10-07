@@ -60,6 +60,40 @@ class ResponseBodyFormatterTest {
     }
 
     @Test
+    fun `a json content type announcing its charset is still json`() {
+        val formatted = formatBody(ascii("{\"a\":1}"), "application/json; charset=utf-8")
+
+        assertThat(formatted.kind).isEqualTo(BodyKind.JSON)
+    }
+
+    @Test
+    fun `a json body is json whatever the server called it`() {
+        // Servers ship JSON as octet-stream, as text/plain, and with no content type at all; the
+        // body is the only evidence that cannot be wrong about what it holds
+        for (mimeType in listOf("application/octet-stream", "text/plain", null)) {
+            val formatted = formatBody(ascii("{\"a\":1}"), mimeType)
+
+            assertThat(formatted.kind).describedAs("a body served as %s", mimeType)
+                .isEqualTo(BodyKind.JSON)
+        }
+    }
+
+    @Test
+    fun `a binary body that opens on neither an object nor an array stays binary`() {
+        // A gzip stream starts with 0x1F, a sentence with a letter: neither is JSON
+        assertThat(formatBody(byteArrayOf(0x1F, 0x8B.toByte(), 0x08), "application/octet-stream").kind)
+            .isEqualTo(BodyKind.BINARY)
+        assertThat(formatBody(ascii("plain words"), "text/plain").kind).isEqualTo(BodyKind.TEXT)
+    }
+
+    @Test
+    fun `a json body with a byte order mark is still json`() {
+        val body = byteArrayOf(0xEF.toByte(), 0xBB.toByte(), 0xBF.toByte()) + ascii("{\"a\":1}")
+
+        assertThat(formatBody(body, "application/json").kind).isEqualTo(BodyKind.JSON)
+    }
+
+    @Test
     fun `invalid json falls back to raw text`() {
         val formatted = formatBody(ascii("not json at all"), "application/json")
 

@@ -201,10 +201,10 @@ class NetworkEngineOkHttp(
                 Timber.v("Cache MISS: ${request.url}")
             }
 
-            if (!response.isSuccessful) {
-                Timber.w("OkHttp request failed: ${response.code} ${request.url}")
-                return null // Let WebView handle failures
-            }
+            // Error responses are ours to return too: an inspector worth the name shows the status,
+            // the headers and the body of a 404 as readily as those of a 200. Handing them back to
+            // WebView instead would leave our requests panel with nothing to report but the URL.
+            // `response.body` is there for error codes just the same.
 
             // Extract response data
             val body = response.body

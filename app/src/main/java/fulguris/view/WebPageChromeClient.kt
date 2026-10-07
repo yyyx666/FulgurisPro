@@ -395,11 +395,17 @@ class WebPageChromeClient(
             val tag = "JavaScript"
             val log = "${messageLevel()} - ${message()} -- from line ${lineNumber()} of ${sourceId()}"
 
-            // Collect the console message object in WebPageTab
-            webPageTab.addConsoleMessage(consoleMessage)
+            val msg = message()
+
+            // Our WebSocket observer reports through the console, see WebSocketObserver.js. That is
+            // our own plumbing rather than the page talking, so it stays out of the console panel:
+            // a JSON blob per socket is noise next to the page's own logging.
+            if (!msg.startsWith(WS_REPORT_PREFIX)) {
+                // Collect the console message object in WebPageTab
+                webPageTab.addConsoleMessage(consoleMessage)
+            }
 
             // Check if this is a Fulguris meta tag notification from our MutationObserver
-            val msg = message()
             if (messageLevel() == ConsoleMessage.MessageLevel.TIP
                 && userPreferences.colorModeEnabled
                 && msg.startsWith("fulguris: ")) {
@@ -431,6 +437,15 @@ class WebPageChromeClient(
                 }
             }
 
+            // WebSocket lifecycle from our injected observer, see WebSocketObserver.js. Deliberately
+            // outside the theme-color branch above: a WebSocket is worth listing whatever the theme
+            // fetching says, so this keys on the prefix alone.
+            if (msg.startsWith(WS_REPORT_PREFIX)) {
+                webPageTab.webPageClient.recordWebSocketReport(
+                    msg.substringAfter(WS_REPORT_PREFIX)
+                )
+            }
+
             // Here is what we got on HONOR Magic V2:
             // - console.log: LOG
             // - console.info: LOG
@@ -452,6 +467,11 @@ class WebPageChromeClient(
             }
         }
         return true
+    }
+
+    companion object {
+        /** Console prefix our WebSocket observer reports under, see WebSocketObserver.js. */
+        private const val WS_REPORT_PREFIX = "fulguris: ws: "
     }
 
 }

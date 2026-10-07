@@ -59,6 +59,7 @@ import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.isVisible
 import androidx.customview.widget.ViewDragHelper
+import android.widget.Toast
 import androidx.databinding.DataBindingUtil
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.lifecycle.LifecycleOwner
@@ -125,12 +126,16 @@ import fulguris.utils.*
 import fulguris.view.*
 import fulguris.view.SearchView
 import io.reactivex.Completable
+import io.reactivex.Maybe
 import io.reactivex.Scheduler
 import io.reactivex.rxkotlin.subscribeBy
 import junit.framework.Assert.assertNull
 import org.json.JSONObject
+import org.json.JSONTokener
 import timber.log.Timber
 import java.io.IOException
+import java.net.HttpURLConnection
+import java.net.URL
 import java.util.*
 import javax.inject.Inject
 import kotlin.math.abs
@@ -207,6 +212,8 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
     lateinit var databaseScheduler: Scheduler
     @Inject @field:MainScheduler
     lateinit var mainScheduler: Scheduler
+    @Inject @field:NetworkScheduler
+    lateinit var networkScheduler: Scheduler
     @Inject lateinit var homePageFactory: HomePageFactory
     @Inject lateinit var incognitoPageFactory: IncognitoPageFactory
     @Inject lateinit var incognitoPageInitializer: IncognitoPageInitializer
@@ -782,6 +789,10 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
                 dismiss()
                 showPageRequests()
             }
+            onMenuItemClicked(iBinding.menuItemViewSource) {
+                dismiss()
+                showPageSource()
+            }
             onMenuItemClicked(iBinding.menuItemConsole) {
                 dismiss()
                 showConsole()
@@ -994,6 +1005,181 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
      */
     private fun showPageRequests() {
         iBottomSheet.setLayout(R.layout.fragment_page_requests).show()
+    }
+
+    /**
+     * Show the source of the current page, the way a desktop browser's view-source does.
+     *
+     * Two documents can be called "the source" and they are not the same: what the server sent, and
+     * what the page made of it once its scripts ran. The former is what a user opening view-source
+     * came for, so it is what we show, with the rendered DOM one switch away.
+     *
+     * What the server sent is the page's own response when our inspector captured it, which only
+     * happens with the OkHttp or HttpURLConnection engine. Otherwise we ask the server again and say
+     * so, a second request being free to answer differently from the one the page is showing.
+     *
+     * Read only, the way a desktop browser's view-source is: editing a live document from this
+     * dialog is a footgun, not a feature.
+     */
+    private fun showPageSource() {
+        val view = currentTabView ?: return
+
+        view.evaluateJavascript("(function(){return document.documentElement.outerHTML})()") { value ->
+            // evaluateJavascript hands back a JSON string literal, quotes and escapes included:
+            // decode it rather than chaining replaces, which mishandle anything but the simplest page
+            val rendered = try {
+                JSONTokener(value).nextValue() as? String
+            } catch (e: Exception) {
+                null
+            } ?: return@evaluateJavascript
+
+            loadOriginalSource(view.url ?: "") { original, note ->
+                showViewSourceDialog(rendered, original, note)
+            }
+        }
+    }
+
+    /**
+     * The page's original source, and what to tell the user when what we hand back is not the
+     * response the page was actually served.
+     *
+     * Calls back on the main thread.
+     */
+    private fun loadOriginalSource(url: String, callback: (String?, String?) -> Unit) {
+        // An internal page was never fetched from anywhere: its DOM is all there is
+        val scheme = try {
+            Uri.parse(url).scheme
+        } catch (e: Exception) {
+            null
+        }
+        if (scheme == null || (scheme != "http" && scheme != "https")) {
+            callback(null, getString(R.string.page_source_internal))
+            return
+        }
+
+        // Our inspector's copy of the response is what the server actually sent this page
+        val captured = capturedMainFrameSource(url)
+        if (captured != null) {
+            callback(captured.first, captured.second)
+            return
+        }
+
+        // Ask as the tab would, cookies and user agent included: a re-fetch without them hands back
+        // the login page a signed-in user is not looking at, which reads as a broken feature
+        val userAgent = currentTabView?.settings?.userAgentString
+        val cookie = CookieManager.getInstance().getCookie(url)
+
+        // Maybe, not Single: a body we could not read is an empty result, not a failure, and the two
+        // lead to the same note. Plain subscribe rather than the rxkotlin subscribeBy the rest of the
+        // file uses, whose Maybe extension is bounded to non-null values and so does not fit a fetch
+        // that may hand back nothing.
+        Maybe.fromCallable { fetchPageSource(url, userAgent, cookie) }
+            .subscribeOn(networkScheduler)
+            .observeOn(mainScheduler)
+            .subscribe(
+                { fetched -> callback(fetched, getString(R.string.page_source_refetched)) },
+                { error ->
+                    Timber.w(error, "Could not fetch page source for $url")
+                    callback(null, getString(R.string.page_source_failed))
+                },
+                { callback(null, getString(R.string.page_source_failed)) }
+            )
+    }
+
+    /**
+     * The response our inspector captured for [url] itself, and the note that goes with it, or null
+     * when it captured none.
+     *
+     * Only a real network engine tees off the page's own response, so with the default WebView
+     * engine this is always null and the caller falls back to a re-fetch.
+     *
+     * The URL has to match, fragments aside: a tab carries one client across navigations, so its
+     * rows from earlier pages are still there, and handing back some other page's body as this
+     * page's source would be worse than saying we have no source at all.
+     */
+    private fun capturedMainFrameSource(url: String): Pair<String, String?>? {
+        val client = tabsManager.currentTab?.webPageClient ?: return null
+        val wanted = url.substringBefore('#')
+        val request = client.getPageRequests()
+            .lastOrNull { it.isMainFrame && it.bodyId != null && it.url.substringBefore('#') == wanted }
+            ?: return null
+        val body = request.bodyId?.let { client.getCapturedBody(it) } ?: return null
+        val text = formatBody(body.bytes, request.mimeType).text ?: return null
+
+        return text to if (body.truncated) getString(R.string.page_source_truncated) else null
+    }
+
+    /**
+     * Fetch [url] again and hand back its body as text, or null when it could not be read.
+     *
+     * Runs off the main thread. The charset comes from the response's own `Content-Type`, decoded
+     * the same way our inspector decodes a captured body.
+     */
+    private fun fetchPageSource(url: String, userAgent: String?, cookie: String?): String? = try {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        connection.connectTimeout = PAGE_SOURCE_TIMEOUT_MS
+        connection.readTimeout = PAGE_SOURCE_TIMEOUT_MS
+        connection.instanceFollowRedirects = true
+        if (!userAgent.isNullOrEmpty()) {
+            connection.setRequestProperty("User-Agent", userAgent)
+        }
+        if (!cookie.isNullOrEmpty()) {
+            connection.setRequestProperty("Cookie", cookie)
+        }
+        val contentType = connection.contentType
+        val bytes = connection.inputStream.use { it.readBytes() }
+        formatBody(bytes, contentType).text
+    } catch (e: Exception) {
+        Timber.w(e, "Could not fetch page source for $url")
+        null
+    }
+
+    /**
+     * Show the page's original source and its rendered DOM in one dialog, a switch between the two.
+     *
+     * [original] is null when we have none, in which case the switch is hidden rather than offering
+     * two views that are the same one.
+     */
+    private fun showViewSourceDialog(rendered: String, original: String?, note: String?) {
+        val dialogLayout = layoutInflater.inflate(R.layout.dialog_view_source, null)
+        val codeView: CodeView = dialogLayout.findViewById(R.id.dialog_multi_line)
+        val switch: RadioGroup = dialogLayout.findViewById(R.id.view_source_switch)
+        val noteView: TextView = dialogLayout.findViewById(R.id.view_source_note)
+
+        // Selectable so the source can be picked from, but not editable: no keyboard, no cursor
+        codeView.keyListener = null
+        codeView.isCursorVisible = false
+        codeView.setTextIsSelectable(true)
+        // A desktop browser wraps source, and a phone is no place for horizontal scrolling
+        codeView.setHorizontallyScrolling(false)
+
+        // Copy takes whichever view is on screen, so we keep it rather than reading the field back
+        // at copy time
+        var shown = original ?: rendered
+        codeView.setText(shown)
+
+        noteView.text = note
+        noteView.isVisible = !note.isNullOrEmpty()
+
+        if (original == null) {
+            switch.isVisible = false
+        } else {
+            switch.setOnCheckedChangeListener { _, checkedId ->
+                shown = if (checkedId == R.id.view_source_original) original else rendered
+                codeView.setText(shown)
+            }
+            switch.check(R.id.view_source_original)
+        }
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.page_source)
+            .setView(dialogLayout)
+            .setNeutralButton(R.string.action_copy) { _, _ ->
+                clipboardManager.copyToClipboard(shown, getString(R.string.page_source))
+                Toast.makeText(this, R.string.message_code_copied, Toast.LENGTH_SHORT).show()
+            }
+            .setPositiveButton(R.string.action_ok) { _, _ -> }
+            .show()
     }
 
     /**
@@ -5699,35 +5885,6 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
         val currentTab = tabsManager.currentTab ?: return
 
         BrowserDialog.showWithIcons(this, this.getString(R.string.dialog_tools_title),
-            /*
-            DialogItem(
-                icon = this.drawable(R.drawable.ic_baseline_code_24),
-                title = R.string.page_source) {
-                currentTab.webView?.evaluateJavascript("""(function() {
-                        return "<html>" + document.getElementsByTagName('html')[0].innerHTML + "</html>";
-                     })()""".trimMargin()) {
-                    // Hacky workaround for weird WebView encoding bug
-                    var name = it?.replace("\\u003C", "<")
-                    name = name?.replace("\\n", System.getProperty("line.separator").toString())
-                    name = name?.replace("\\t", "")
-                    name = name?.replace("\\\"", "\"")
-                    name = name?.substring(1, name.length - 1)
-
-                    val builder = MaterialAlertDialogBuilder(this)
-                    val inflater = this.layoutInflater
-                    builder.setTitle(R.string.page_source)
-                    val dialogLayout = inflater.inflate(R.layout.dialog_view_source, null)
-                    val editText = dialogLayout.findViewById<CodeEditor>(R.id.dialog_multi_line)
-                    editText.setText(name, 1)
-                    builder.setView(dialogLayout)
-                    builder.setNegativeButton(R.string.action_cancel) { _, _ -> }
-                    builder.setPositiveButton(R.string.action_ok) { _, _ ->
-                        editText.setText(editText.text?.toString()?.replace("\'", "\\\'"), 1)
-                        currentTab.loadUrl("javascript:(function() { document.documentElement.innerHTML = '" + editText.text.toString() + "'; })()")
-                    }
-                    builder.show()
-                }
-            },*/
             DialogItem(
                 icon= this.drawable(R.drawable.ic_script_add),
                 title = R.string.inspect){
@@ -5879,6 +6036,13 @@ abstract class WebBrowserActivity : ThemedBrowserActivity(),
         const val INTENT_CLOSE_ALL_TABS = "fulguris.action.CLOSE_ALL_TABS"
 
         private const val FILE_CHOOSER_REQUEST_CODE = 1111
+
+        /**
+         * How long we wait for the value-source re-fetch, connect and read alike, see
+         * [loadOriginalSource]. A page's source is there or it is not; a minute of a spinnerless
+         * dialog gains nothing.
+         */
+        private const val PAGE_SOURCE_TIMEOUT_MS = 15000
 
         // Constant
         private val MATCH_PARENT = LayoutParams(LayoutParams.MATCH_PARENT, LayoutParams.MATCH_PARENT)
